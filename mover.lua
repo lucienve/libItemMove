@@ -98,7 +98,8 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                             qty = moveQty,
                             endQty = math.max(currentQty - moveQty, 0),
                             item = itemString,
-                            isPartial = true
+                            isPartial = true,
+                            initiated = false
                         }
                         remainingToMove = remainingToMove - moveQty
                         pData.roomLeft = pData.roomLeft - moveQty
@@ -115,7 +116,8 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                             qty = moveQty,
                             endQty = math.max(currentQty - moveQty, 0),
                             item = itemString,
-                            isPartial = false
+                            isPartial = false,
+                            initiated = false
                         }
                         remainingToMove = remainingToMove - moveQty
                     end
@@ -130,54 +132,57 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
 
         -- Execute move operations
         for srcSlotId, moveData in pairs(pending) do
-            if APIAdapter.GetCursorInfo() then
-                APIAdapter.ClearCursor()
-            end
-
-            -- Slot lock check: wait if source or target slot is locked in transit (with 2s timeout safety)
-            local sBag, sSlot = Utils.decode_bagslot(srcSlotId)
-            local tBag, tSlot = Utils.decode_bagslot(moveData.target)
-            local lockTimeout = ((_G.GetTime and _G.GetTime()) or os.time()) + 2
-            local isTimedOut = false
-
-            while context:IsSlotLocked(sBag, sSlot) or context:IsSlotLocked(tBag, tSlot) do
-                if ((_G.GetTime and _G.GetTime()) or os.time()) >= lockTimeout then
-                    isTimedOut = true
-                    break
+            if not moveData.initiated then
+                if APIAdapter.GetCursorInfo() then
+                    APIAdapter.ClearCursor()
                 end
-                coroutine.yield()
-            end
 
-            if isTimedOut then
-                APIAdapter.ClearCursor()
-                NotifyCallback(callback, dispatchGlobalEvent, "TIMEOUT_ERROR")
-                return
-            end
+                -- Slot lock check: wait if source or target slot is locked in transit (with 2s timeout safety)
+                local sBag, sSlot = Utils.decode_bagslot(srcSlotId)
+                local tBag, tSlot = Utils.decode_bagslot(moveData.target)
+                local lockTimeout = ((_G.GetTime and _G.GetTime()) or os.time()) + 2
+                local isTimedOut = false
 
-            context:MoveSlot(srcSlotId, moveData.target, moveData.qty)
-            coroutine.yield() -- Yield to allow WoW client to process click/packet
-
-            -- Stuck Cursor Recovery (up to 10 retries with item ID validation)
-            local cursorType, cursorItemId = APIAdapter.GetCursorInfo()
-            if cursorType == "item" then
-                local retries = 0
-                local expectedId = Utils.GetItemIdFromString(moveData.item)
-
-                while APIAdapter.GetCursorInfo() == "item" and retries < 10 do
-                    local _, cItemId = APIAdapter.GetCursorInfo()
-                    if cItemId and expectedId and cItemId ~= expectedId then
-                        -- Held item does not match expected target item; break to avoid dropping wrong item
+                while context:IsSlotLocked(sBag, sSlot) or context:IsSlotLocked(tBag, tSlot) do
+                    if ((_G.GetTime and _G.GetTime()) or os.time()) >= lockTimeout then
+                        isTimedOut = true
                         break
                     end
-                    context:PickupItem(tBag, tSlot) -- Retry drop click
                     coroutine.yield()
-                    retries = retries + 1
                 end
-            end
 
-            if context.isGuildBank then
-                movedSlotId = srcSlotId
-                break -- Enforce Guild Bank throttling constraint: 1 move per yield cycle
+                if isTimedOut then
+                    APIAdapter.ClearCursor()
+                    NotifyCallback(callback, dispatchGlobalEvent, "TIMEOUT_ERROR")
+                    return
+                end
+
+                context:MoveSlot(srcSlotId, moveData.target, moveData.qty)
+                moveData.initiated = true
+                coroutine.yield() -- Yield to allow WoW client to process click/packet
+
+                -- Stuck Cursor Recovery (up to 10 retries with item ID validation)
+                local cursorType, cursorItemId = APIAdapter.GetCursorInfo()
+                if cursorType == "item" then
+                    local retries = 0
+                    local expectedId = Utils.GetItemIdFromString(moveData.item)
+
+                    while APIAdapter.GetCursorInfo() == "item" and retries < 10 do
+                        local _, cItemId = APIAdapter.GetCursorInfo()
+                        if cItemId and expectedId and cItemId ~= expectedId then
+                            -- Held item does not match expected target item; break to avoid dropping wrong item
+                            break
+                        end
+                        context:PickupItem(tBag, tSlot) -- Retry drop click
+                        coroutine.yield()
+                        retries = retries + 1
+                    end
+                end
+
+                if context.isGuildBank then
+                    movedSlotId = srcSlotId
+                    break -- Enforce Guild Bank throttling constraint: 1 move per yield cycle
+                end
             end
         end
 
