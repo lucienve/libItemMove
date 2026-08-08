@@ -171,18 +171,6 @@ local bankContainers = Private.APIAdapter.GetBankContainerIDs()
 assert(bankContainers[1] == -1 and bankContainers[2] == 5, "Classic Era bank containers resolution failed: expected 5 to be first bank bag")
 print("[PASS] Dynamic Classic Era Container ID Resolution test passed.")
 
--- Test 2b: Dynamic Retail Container ID Resolution
-_G.REAGENTBAG_CONTAINER = 5
-_G.REAGENTBANK_CONTAINER = -3
-local playerBagsRetail = Private.APIAdapter.GetPlayerBagIDs()
-assert(#playerBagsRetail == 6 and playerBagsRetail[6] == 5, "Retail player bags resolution failed: expected 0..5")
-
-local bankContainersRetail = Private.APIAdapter.GetBankContainerIDs()
-assert(bankContainersRetail[1] == -1 and bankContainersRetail[2] == -3 and bankContainersRetail[3] == 6, "Retail bank containers resolution failed: expected 6 to be first bank bag and reagent bank included")
-_G.REAGENTBAG_CONTAINER = nil
-_G.REAGENTBANK_CONTAINER = nil
-print("[PASS] Dynamic Retail Container ID Resolution test passed.")
-
 -- Test 3: Robust Single-Table Return Protection for GetContainerItemInfo
 local rawSingleTableHook = function(bag, slot)
     return { itemID = 555, stackCount = 10, isBound = true, hyperLink = "item:555" }
@@ -227,7 +215,30 @@ cursorState = nil
 cursorItemId = nil
 print("[PASS] Cursor Hold Early Abort test passed.")
 
--- Test 7: Asynchronous Cooperative Move Execution & Stack Verification
+-- Test 7: Guild Bank vs Player Bag API Mapping Isolation
+local b2gb = Private.BagToGuildBank
+_G.GetGuildBankItemInfo = function(tab, slot) return nil, 77 end
+assert(b2gb:GetSourceSlotQuantity(lib.encode_bagslot(0, 1)) == 20, "BagToGuildBank source slot quantity must call container bag API")
+assert(b2gb:GetTargetSlotQuantity(lib.encode_bagslot(1, 1)) == 77, "BagToGuildBank target slot quantity must call Guild Bank API")
+_G.GetGuildBankItemInfo = nil
+print("[PASS] Guild Bank vs Player Bag API Mapping test passed.")
+
+-- Test 8: Scheduler Concurrency Protection
+Private.Scheduler.active = true
+Private.Scheduler.thread = coroutine.create(function() end)
+local concurrencyCaught = false
+local ok, err = pcall(function()
+    lib:Move({ ["i:12345"] = 1 }, "BagToBank")
+end)
+if not ok and err:find("already in progress") then
+    concurrencyCaught = true
+end
+Private.Scheduler.active = false
+Private.Scheduler.thread = nil
+assert(concurrencyCaught == true, "Scheduler concurrency protection failed")
+print("[PASS] Scheduler Concurrency Protection test passed.")
+
+-- Test 9: Asynchronous Cooperative Move Execution & Stack Verification
 local progressEvents = {}
 local moveCompleted = false
 

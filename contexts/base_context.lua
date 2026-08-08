@@ -31,13 +31,76 @@ function BaseContext:GetItemIdFromString(itemString)
     return Utils.GetItemIdFromString(itemString)
 end
 
---- Checks if a slot is currently locked in transit.
+--- Checks if a container slot is currently locked in transit.
 --- @param bag number
 --- @param slot number
 --- @return boolean isLocked
 function BaseContext:IsSlotLocked(bag, slot)
     local info = APIAdapter.GetContainerItemInfo(bag, slot)
     return info and info.isLocked or false
+end
+
+--- Checks if the source slot is currently locked in transit.
+--- @param bag number
+--- @param slot number
+--- @return boolean isLocked
+function BaseContext:IsSourceSlotLocked(bag, slot)
+    return self:IsSlotLocked(bag, slot)
+end
+
+--- Checks if the target slot is currently locked in transit.
+--- @param bag number
+--- @param slot number
+--- @return boolean isLocked
+function BaseContext:IsTargetSlotLocked(bag, slot)
+    return self:IsSlotLocked(bag, slot)
+end
+
+--- Returns item stack count at target slot ID.
+--- @param slotId SlotId
+--- @return number count
+function BaseContext:GetSlotQuantity(slotId)
+    local bag, slot = Utils.decode_bagslot(slotId)
+    local info = APIAdapter.GetContainerItemInfo(bag, slot)
+    return info and info.stackCount or 0
+end
+
+--- Returns item stack count at source slot ID.
+--- @param slotId SlotId
+--- @return number count
+function BaseContext:GetSourceSlotQuantity(slotId)
+    return self:GetSlotQuantity(slotId)
+end
+
+--- Returns item stack count at target slot ID.
+--- @param slotId SlotId
+--- @return number count
+function BaseContext:GetTargetSlotQuantity(slotId)
+    return self:GetSlotQuantity(slotId)
+end
+
+--- Returns numeric item ID at bag & slot.
+--- @param bag number
+--- @param slot number
+--- @return number? itemID
+function BaseContext:GetSlotItemId(bag, slot)
+    return APIAdapter.GetContainerItemID(bag, slot)
+end
+
+--- Returns numeric item ID at source bag & slot.
+--- @param bag number
+--- @param slot number
+--- @return number? itemID
+function BaseContext:GetSourceSlotItemId(bag, slot)
+    return self:GetSlotItemId(bag, slot)
+end
+
+--- Returns numeric item ID at target bag & slot.
+--- @param bag number
+--- @param slot number
+--- @return number? itemID
+function BaseContext:GetTargetSlotItemId(bag, slot)
+    return self:GetSlotItemId(bag, slot)
 end
 
 --- Helper function to safely query slot count across WoW versions.

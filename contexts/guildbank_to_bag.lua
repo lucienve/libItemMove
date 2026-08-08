@@ -52,21 +52,77 @@ function GuildBankToBag:PickupItem(bag, slot)
     APIAdapter.PickupContainerItem(bag, slot)
 end
 
---- Returns current stack quantity at target bag slot ID.
+--- Returns current item quantity in Guild Bank source tab slot ID.
 --- @param slotId SlotId
---- @return number quantity Stack count (0 if empty)
-function GuildBankToBag:GetSlotQuantity(slotId)
+--- @return number count
+function GuildBankToBag:GetSourceSlotQuantity(slotId)
+    local tab, slot = Utils.decode_bagslot(slotId)
+    if _G.GetGuildBankItemInfo then
+        local _, count = _G.GetGuildBankItemInfo(tab, slot)
+        return count or 0
+    end
+    return 0
+end
+
+--- Returns current stack quantity at player target bag slot ID.
+--- @param slotId SlotId
+--- @return number count
+function GuildBankToBag:GetTargetSlotQuantity(slotId)
     local bag, slot = Utils.decode_bagslot(slotId)
     local info = APIAdapter.GetContainerItemInfo(bag, slot)
     return info and info.stackCount or 0
 end
 
---- Returns numeric Item ID at bag and slot.
+--- Retained for backwards compatibility: defaults to target slot quantity.
+--- @param slotId SlotId
+--- @return number count
+function GuildBankToBag:GetSlotQuantity(slotId)
+    return self:GetTargetSlotQuantity(slotId)
+end
+
+--- Returns numeric Item ID at Guild Bank source tab & slot.
+--- @param tab number
+--- @param slot number
+--- @return number? itemID
+function GuildBankToBag:GetSourceSlotItemId(tab, slot)
+    if _G.GetGuildBankItemLink then
+        local link = _G.GetGuildBankItemLink(tab, slot)
+        return Utils.GetItemIdFromString(link)
+    end
+    return nil
+end
+
+--- Returns numeric Item ID at player target bag & slot.
+--- @param bag number
+--- @param slot number
+--- @return number? itemID
+function GuildBankToBag:GetTargetSlotItemId(bag, slot)
+    return APIAdapter.GetContainerItemID(bag, slot)
+end
+
+--- Retained for backwards compatibility: defaults to target slot item ID.
 --- @param bag number
 --- @param slot number
 --- @return number? itemID
 function GuildBankToBag:GetSlotItemId(bag, slot)
-    return APIAdapter.GetContainerItemID(bag, slot)
+    return self:GetTargetSlotItemId(bag, slot)
+end
+
+--- Guild Bank slots do not support container item lock status; returns false.
+--- @param tab number
+--- @param slot number
+--- @return boolean isLocked
+function GuildBankToBag:IsSourceSlotLocked(tab, slot)
+    return false
+end
+
+--- Checks if target player bag slot is locked in transit.
+--- @param bag number
+--- @param slot number
+--- @return boolean isLocked
+function GuildBankToBag:IsTargetSlotLocked(bag, slot)
+    local info = APIAdapter.GetContainerItemInfo(bag, slot)
+    return info and info.isLocked or false
 end
 
 --- Retrieves list of empty slot IDs in destination player bags sorted by family.

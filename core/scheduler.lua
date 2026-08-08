@@ -45,10 +45,14 @@ function Scheduler.Tick()
     end
 end
 
---- Starts a new cooperative task thread.
+--- Starts a new cooperative task thread. Safely rejects concurrent start calls while active.
 --- @param func function Entry point function to run inside coroutine
 --- @param ... any Arguments passed to func
 function Scheduler.Start(func, ...)
+    if Scheduler.active and Scheduler.thread and coroutine.status(Scheduler.thread) ~= "dead" then
+        error("LibItemMove: A move transaction is already in progress.")
+    end
+
     EnsureFrame()
 
     Scheduler.thread = coroutine.create(func)
