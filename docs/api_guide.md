@@ -80,7 +80,7 @@ local bag, slot = LibItemMove.decode_bagslot(-995)
 
 ## 4. Callback System & Error Handling
 
-`LibItemMove-1.0` uses a **hybrid callback system** (Option C). You can provide an inline callback function when calling `Move()`, and/or register for global events via `CallbackHandler-1.0`.
+`LibItemMove-1.0` uses a **hybrid callback system**. You can provide an inline callback function when calling `Move()`, and/or register for global events via `CallbackHandler-1.0`.
 
 ### Event Types & Arguments
 
