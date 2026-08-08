@@ -12,8 +12,13 @@ local WarbankToBag = BaseContext:New({
 }) --[[@as WarbankToBag]]
 Private.WarbankToBag = WarbankToBag
 
-WarbankToBag.PLAYER_BAGS = { 0, 1, 2, 3, 4, 5 }
 WarbankToBag.WARBANK_CONTAINERS = { 13, 14, 15, 16, 17 }
+
+--- Returns list of player bag IDs dynamically based on WoW client version.
+--- @return number[]
+function WarbankToBag:GetPlayerBags()
+    return APIAdapter.GetPlayerBagIDs()
+end
 
 --- Splits item from Warbank slot and picks up on target bag slot.
 --- @param fromSlotId SlotId Packed source slot ID
@@ -53,14 +58,14 @@ end
 --- Retrieves list of empty slot IDs in destination player bags sorted by family.
 --- @param emptySlotIdsTable SlotId[] Array to populate
 function WarbankToBag:GetEmptySlots(emptySlotIdsTable)
-    self:ScanEmptySlots(self.PLAYER_BAGS, emptySlotIdsTable)
+    self:ScanEmptySlots(self:GetPlayerBags(), emptySlotIdsTable)
 end
 
 --- Retrieves list of partial stack slots in destination player bags.
 --- @param itemString string|number
 --- @param partialSlotsTable table[]
 function WarbankToBag:GetPartialSlots(itemString, partialSlotsTable)
-    self:ScanPartialSlots(self.PLAYER_BAGS, itemString, partialSlotsTable)
+    self:ScanPartialSlots(self:GetPlayerBags(), itemString, partialSlotsTable)
 end
 
 --- Iterates Warbank slots containing specified item.

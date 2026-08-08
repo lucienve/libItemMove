@@ -12,8 +12,17 @@ local BagToBank = BaseContext:New({
 }) --[[@as BagToBank]]
 Private.BagToBank = BagToBank
 
-BagToBank.PLAYER_BAGS = { 0, 1, 2, 3, 4, 5 }
-BagToBank.BANK_CONTAINERS = { -1, 6, 7, 8, 9, 10, 11, 12 }
+--- Returns list of player bag IDs dynamically based on WoW client version.
+--- @return number[]
+function BagToBank:GetPlayerBags()
+    return APIAdapter.GetPlayerBagIDs()
+end
+
+--- Returns list of bank container IDs dynamically based on WoW client version (-1, -3, 5..11 in Classic or 6..12 in Retail).
+--- @return number[]
+function BagToBank:GetBankContainers()
+    return APIAdapter.GetBankContainerIDs()
+end
 
 --- Splits item from source slot and picks up on target bank slot.
 --- @param fromSlotId SlotId Packed source slot ID
@@ -53,21 +62,21 @@ end
 --- Retrieves list of empty slot IDs in destination bank containers sorted by family.
 --- @param emptySlotIdsTable SlotId[] Array to populate
 function BagToBank:GetEmptySlots(emptySlotIdsTable)
-    self:ScanEmptySlots(self.BANK_CONTAINERS, emptySlotIdsTable)
+    self:ScanEmptySlots(self:GetBankContainers(), emptySlotIdsTable)
 end
 
 --- Retrieves list of partial stack slots in destination bank containers.
 --- @param itemString string|number
 --- @param partialSlotsTable table[]
 function BagToBank:GetPartialSlots(itemString, partialSlotsTable)
-    self:ScanPartialSlots(self.BANK_CONTAINERS, itemString, partialSlotsTable)
+    self:ScanPartialSlots(self:GetBankContainers(), itemString, partialSlotsTable)
 end
 
 --- Iterates player bag slots containing specified item.
 --- @param itemString string|number
 --- @return fun(): number?, SlotId?, number?
 function BagToBank:SlotIterator(itemString)
-    return self:ScanSourceSlots(self.PLAYER_BAGS, itemString)
+    return self:ScanSourceSlots(self:GetPlayerBags(), itemString)
 end
 
 BagToBank.SlotIdIterator = BagToBank.SlotIterator

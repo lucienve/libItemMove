@@ -12,7 +12,11 @@ local GuildBankToBag = BaseContext:New({
 }) --[[@as GuildBankToBag]]
 Private.GuildBankToBag = GuildBankToBag
 
-GuildBankToBag.PLAYER_BAGS = { 0, 1, 2, 3, 4, 5 }
+--- Returns list of player bag IDs dynamically based on WoW client version.
+--- @return number[]
+function GuildBankToBag:GetPlayerBags()
+    return APIAdapter.GetPlayerBagIDs()
+end
 
 --- Checks if the player has withdrawal permissions on the current Guild Bank tab.
 --- @return boolean hasPermission
@@ -68,14 +72,14 @@ end
 --- Retrieves list of empty slot IDs in destination player bags sorted by family.
 --- @param emptySlotIdsTable SlotId[] Array to populate
 function GuildBankToBag:GetEmptySlots(emptySlotIdsTable)
-    self:ScanEmptySlots(self.PLAYER_BAGS, emptySlotIdsTable)
+    self:ScanEmptySlots(self:GetPlayerBags(), emptySlotIdsTable)
 end
 
 --- Retrieves list of partial stack slots in destination player bags.
 --- @param itemString string|number
 --- @param partialSlotsTable table[]
 function GuildBankToBag:GetPartialSlots(itemString, partialSlotsTable)
-    self:ScanPartialSlots(self.PLAYER_BAGS, itemString, partialSlotsTable)
+    self:ScanPartialSlots(self:GetPlayerBags(), itemString, partialSlotsTable)
 end
 
 --- Iterates current Guild Bank tab slots containing specified item.

@@ -4,7 +4,49 @@ Private = Private or {}
 local APIAdapter = {}
 Private.APIAdapter = APIAdapter
 
+--- Returns list of player character bag container IDs dynamically based on WoW version.
+--- Classic Era (1.15.x): Bag 0 (Backpack) + Bags 1..4 = { 0, 1, 2, 3, 4 }
+--- Modern Retail (11.x): Bag 0 + Bags 1..4 + Bag 5 (Reagent Bag) = { 0, 1, 2, 3, 4, 5 }
+--- @return number[] playerBags
+function APIAdapter.GetPlayerBagIDs()
+    local numBagSlots = _G["NUM_BAG_SLOTS"] or 4
+    local bags = { 0 }
+    for i = 1, numBagSlots do
+        table.insert(bags, i)
+    end
+    -- Check if Reagent Bag (Bag 5) is available in Retail (where NUM_BAG_SLOTS > 4 or REAGENTBAG_CONTAINER exists)
+    if _G["REAGENTBAG_CONTAINER"] and _G["REAGENTBAG_CONTAINER"] == 5 then
+        table.insert(bags, 5)
+    end
+    return bags
+end
+
+--- Returns list of character bank container IDs dynamically based on WoW version.
+--- Classic Era: -1 (BANK_CONTAINER) + Bank Bags 5..11
+--- Modern Retail: -1 (BANK_CONTAINER) + -3 (REAGENTBANK_CONTAINER) + Bank Bags 6..12
+--- @return number[] bankContainers
+function APIAdapter.GetBankContainerIDs()
+    local containers = { -1 }
+
+    -- Reagent Bank (-3) in Retail / modern expansions
+    local isUnlockedFn = _G["IsReagentBankUnlocked"]
+    if _G["REAGENTBANK_CONTAINER"] or (type(isUnlockedFn) == "function" and isUnlockedFn()) then
+        table.insert(containers, -3)
+    end
+
+    local numBagSlots = _G["NUM_BAG_SLOTS"] or 4
+    local numBankSlots = _G["NUM_BANKBAGSLOTS"] or 7
+    local startBankBag = numBagSlots + 1 -- Bag 5 in Classic (NUM_BAG_SLOTS=4), Bag 6 in Retail (NUM_BAG_SLOTS=5)
+
+    for i = startBankBag, startBankBag + numBankSlots - 1 do
+        table.insert(containers, i)
+    end
+
+    return containers
+end
+
 --- Returns normalized container item information table or nil if slot is empty.
+--- Safe against single-table returns (C_Container) vs multi-returns (Classic Era).
 --- @param bag number Container ID
 --- @param slot number Slot index
 --- @return table? info Table with fields: stackCount, isLocked, itemID, isBound, itemLink
@@ -23,11 +65,21 @@ function APIAdapter.GetContainerItemInfo(bag, slot)
         end
     end
 
-    -- Fallback for Classic Era multi-return GetContainerItemInfo
-    local getInfo = _G["GetContainerItemInfo"] or (C_Container and C_Container.GetContainerItemInfo)
-    if getInfo then
-        local texture, count, locked, quality, readable, lootable, link, isFiltered, noValue, itemID, isBound = getInfo(bag, slot)
-        if texture or count or itemID then
+    -- Fallback for Classic Era GetContainerItemInfo
+    local legacyGetInfo = _G["GetContainerItemInfo"]
+    if legacyGetInfo then
+        local ret1, count, locked, quality, readable, lootable, link, isFiltered, noValue, itemID, isBound = legacyGetInfo(bag, slot)
+
+        -- Safeguard: If GetContainerItemInfo returned a single table (e.g. redirected by another addon or wrapper)
+        if type(ret1) == "table" then
+            return {
+                stackCount = ret1.stackCount or 0,
+                isLocked = ret1.isLocked or false,
+                itemID = ret1.itemID,
+                isBound = ret1.isBound or false,
+                itemLink = ret1.hyperLink or ret1.itemLink
+            }
+        elseif ret1 or count or itemID then
             return {
                 stackCount = count or 0,
                 isLocked = locked or false,

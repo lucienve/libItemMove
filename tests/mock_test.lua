@@ -28,6 +28,9 @@ end
 libraries["CallbackHandler-1.0"] = mockCallbackHandler
 
 -- Mock WoW API Globals
+_G.NUM_BAG_SLOTS = 4
+_G.NUM_BANKBAGSLOTS = 7
+
 local currentTime = 1000.0
 _G.GetTime = function()
     currentTime = currentTime + 0.05
@@ -160,7 +163,30 @@ local bag2, slot2 = lib.decode_bagslot(-995)
 assert(bag2 == -1 and slot2 == 5, "decode_bagslot failed for Bank: expected -1, 5")
 print("[PASS] SlotId Encoding & Decoding test passed.")
 
--- Test 2: Item ID Parsing & Strict Matching
+-- Test 2: Dynamic Classic Era Container ID Resolution
+local playerBags = Private.APIAdapter.GetPlayerBagIDs()
+assert(#playerBags == 5 and playerBags[5] == 4, "Classic Era player bags resolution failed: expected 0..4")
+
+local bankContainers = Private.APIAdapter.GetBankContainerIDs()
+assert(bankContainers[1] == -1 and bankContainers[2] == 5, "Classic Era bank containers resolution failed: expected 5 to be first bank bag")
+print("[PASS] Dynamic Classic Era Container ID Resolution test passed.")
+
+-- Test 3: Robust Single-Table Return Protection for GetContainerItemInfo
+local rawSingleTableHook = function(bag, slot)
+    return { itemID = 555, stackCount = 10, isBound = true, hyperLink = "item:555" }
+end
+
+_G.GetContainerItemInfo = rawSingleTableHook
+local tmpCContainer = _G.C_Container
+_G.C_Container = nil -- Simulate legacy environment with overridden GetContainerItemInfo
+
+local infoSingle = Private.APIAdapter.GetContainerItemInfo(1, 1)
+assert(infoSingle ~= nil and infoSingle.itemID == 555 and infoSingle.isBound == true, "Single-table fallback hook protection failed!")
+_G.C_Container = tmpCContainer
+_G.GetContainerItemInfo = nil
+print("[PASS] Single-table return protection test passed.")
+
+-- Test 4: Item ID Parsing & Strict Matching
 local id1 = Private.Utils.GetItemIdFromString("i:12345")
 local id2 = Private.Utils.GetItemIdFromString("item:12345:0:0")
 assert(id1 == 12345 and id2 == 12345, "GetItemIdFromString failed")
@@ -170,13 +196,13 @@ local match2 = Private.Utils.IsItemMatching("item:12345:200:0", { itemID = 12345
 assert(match1 == true and match2 == false, "Strict item link variant matching failed")
 print("[PASS] Item ID Parsing & Strict Matching test passed.")
 
--- Test 3: Specialty Bag Family Compatibility
+-- Test 5: Specialty Bag Family Compatibility
 assert(Private.Utils.IsFamilyCompatible(4, 0) == true, "General bag compatibility failed")
 assert(Private.Utils.IsFamilyCompatible(4, 4) == true, "Herb bag matching failed")
 assert(Private.Utils.IsFamilyCompatible(4, 8) == false, "Mining vs Herb mismatch failed")
 print("[PASS] Item Family Compatibility test passed.")
 
--- Test 4: Cursor Hold Early Abort Check
+-- Test 6: Cursor Hold Early Abort Check
 cursorState = "item"
 cursorItemId = 9999
 local cursorErrorFired = false
@@ -189,7 +215,7 @@ cursorState = nil
 cursorItemId = nil
 print("[PASS] Cursor Hold Early Abort test passed.")
 
--- Test 5: Asynchronous Cooperative Move Execution & Stack Verification
+-- Test 7: Asynchronous Cooperative Move Execution & Stack Verification
 local progressEvents = {}
 local moveCompleted = false
 

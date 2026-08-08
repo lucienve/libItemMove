@@ -12,7 +12,11 @@ local BagToGuildBank = BaseContext:New({
 }) --[[@as BagToGuildBank]]
 Private.BagToGuildBank = BagToGuildBank
 
-BagToGuildBank.PLAYER_BAGS = { 0, 1, 2, 3, 4, 5 }
+--- Returns list of player bag IDs dynamically based on WoW client version.
+--- @return number[]
+function BagToGuildBank:GetPlayerBags()
+    return APIAdapter.GetPlayerBagIDs()
+end
 
 --- Helper function to safely query slot count across WoW versions.
 --- @param bag number Container ID
@@ -135,7 +139,7 @@ end
 function BagToGuildBank:SlotIterator(itemString)
     local slotList = {}
 
-    for _, bag in ipairs(self.PLAYER_BAGS) do
+    for _, bag in ipairs(self:GetPlayerBags()) do
         local numSlots = GetContainerNumSlots(bag)
 
         for slot = 1, numSlots do

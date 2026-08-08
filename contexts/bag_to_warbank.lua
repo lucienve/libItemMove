@@ -12,8 +12,13 @@ local BagToWarbank = BaseContext:New({
 }) --[[@as BagToWarbank]]
 Private.BagToWarbank = BagToWarbank
 
-BagToWarbank.PLAYER_BAGS = { 0, 1, 2, 3, 4, 5 }
 BagToWarbank.WARBANK_CONTAINERS = { 13, 14, 15, 16, 17 }
+
+--- Returns list of player bag IDs dynamically based on WoW client version.
+--- @return number[]
+function BagToWarbank:GetPlayerBags()
+    return APIAdapter.GetPlayerBagIDs()
+end
 
 --- Splits item from player bag slot and picks up on target Warbank slot.
 --- @param fromSlotId SlotId Packed source slot ID
@@ -67,7 +72,7 @@ end
 --- @param itemString string|number
 --- @return fun(): number?, SlotId?, number?
 function BagToWarbank:SlotIterator(itemString)
-    return self:ScanSourceSlots(self.PLAYER_BAGS, itemString)
+    return self:ScanSourceSlots(self:GetPlayerBags(), itemString)
 end
 
 BagToWarbank.SlotIdIterator = BagToWarbank.SlotIterator
