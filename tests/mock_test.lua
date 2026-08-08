@@ -171,6 +171,18 @@ local bankContainers = Private.APIAdapter.GetBankContainerIDs()
 assert(bankContainers[1] == -1 and bankContainers[2] == 5, "Classic Era bank containers resolution failed: expected 5 to be first bank bag")
 print("[PASS] Dynamic Classic Era Container ID Resolution test passed.")
 
+-- Test 2b: Dynamic Retail Container ID Resolution
+_G.REAGENTBAG_CONTAINER = 5
+_G.REAGENTBANK_CONTAINER = -3
+local playerBagsRetail = Private.APIAdapter.GetPlayerBagIDs()
+assert(#playerBagsRetail == 6 and playerBagsRetail[6] == 5, "Retail player bags resolution failed: expected 0..5")
+
+local bankContainersRetail = Private.APIAdapter.GetBankContainerIDs()
+assert(bankContainersRetail[1] == -1 and bankContainersRetail[2] == -3 and bankContainersRetail[3] == 6, "Retail bank containers resolution failed: expected 6 to be first bank bag and reagent bank included")
+_G.REAGENTBAG_CONTAINER = nil
+_G.REAGENTBANK_CONTAINER = nil
+print("[PASS] Dynamic Retail Container ID Resolution test passed.")
+
 -- Test 3: Robust Single-Table Return Protection for GetContainerItemInfo
 local rawSingleTableHook = function(bag, slot)
     return { itemID = 555, stackCount = 10, isBound = true, hyperLink = "item:555" }

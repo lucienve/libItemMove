@@ -36,7 +36,10 @@ function APIAdapter.GetBankContainerIDs()
 
     local numBagSlots = _G["NUM_BAG_SLOTS"] or 4
     local numBankSlots = _G["NUM_BANKBAGSLOTS"] or 7
-    local startBankBag = numBagSlots + 1 -- Bag 5 in Classic (NUM_BAG_SLOTS=4), Bag 6 in Retail (NUM_BAG_SLOTS=5)
+    local startBankBag = numBagSlots + 1
+    if _G["REAGENTBAG_CONTAINER"] then
+        startBankBag = startBankBag + 1
+    end
 
     for i = startBankBag, startBankBag + numBankSlots - 1 do
         table.insert(containers, i)
