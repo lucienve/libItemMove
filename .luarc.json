@@ -1,0 +1,43 @@
+{
+    "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+    "runtime.version": "Lua 5.1",
+    "runtime.nonstandardSymbol": [
+        "!",
+        "!=",
+        "&&",
+        "||"
+    ],
+    "workspace.library": [
+        ".types/wow-api/Annotations"
+    ],
+    "workspace.ignoreDir": [
+        "libs",
+        ".types",
+        "tests",
+        "log"
+    ],
+    "diagnostics.libraryFiles": "Disable",
+    "diagnostics.ignoredFiles": "Disable",
+    "diagnostics.globals": [
+        "LibStub",
+        "GetTime",
+        "CreateFrame",
+        "GetCursorInfo",
+        "ClearCursor",
+        "SplitGuildBankItem",
+        "PickupGuildBankItem",
+        "GetGuildBankItemInfo",
+        "GetGuildBankItemLink",
+        "GetCurrentGuildBankTab",
+        "C_Container",
+        "C_Item",
+        "C_Bank",
+        "GetContainerItemInfo",
+        "GetContainerItemID",
+        "GetContainerNumSlots",
+        "SplitContainerItem",
+        "PickupContainerItem",
+        "GetItemFamily",
+        "ContainerIDToInventoryID"
+    ]
+}

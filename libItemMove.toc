@@ -1,0 +1,25 @@
+## Interface: 11503, 40400, 110002
+## Title: LibItemMove-1.0
+## Notes: Library for asynchronous, cooperative item movement between bags, banks, warbanks, and guild banks.
+## Author: Lucien
+## Version: 1.0.0
+## OptionalDeps: LibStub, CallbackHandler-1.0
+
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+
+core\types.lua
+core\utils.lua
+core\api_adapter.lua
+core\scheduler.lua
+
+contexts\base_context.lua
+contexts\bag_to_bank.lua
+contexts\bank_to_bag.lua
+contexts\bag_to_guildbank.lua
+contexts\guildbank_to_bag.lua
+contexts\bag_to_warbank.lua
+contexts\warbank_to_bag.lua
+
+mover.lua
+LibItemMove.lua

@@ -1,0 +1,23 @@
+# Customizations and local agent files
+.agents/
+
+# Type annotations downloads
+.types/
+
+# Logging directory and files
+log/
+*.log
+
+# Temporary and backup files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# IDE and editor configurations
+.vscode/
+.idea/
