@@ -240,4 +240,92 @@ function Mover.StartMove(moveQueue, context, callback, dispatchGlobalEvent)
     Scheduler.Start(Mover.MoveThread, moveQueue, context, callback, dispatchGlobalEvent)
 end
 
+--- Threaded cooperative multi-tab move runner loop.
+--- @param moveQueue table Map of tabIndex to single-tab MoveQueue
+--- @param context MoveContext Move strategy context
+--- @param callback function? Direct per-move callback
+--- @param dispatchGlobalEvent function? CallbackHandler dispatcher
+function Mover.MoveMultiTabThread(moveQueue, context, callback, dispatchGlobalEvent)
+    -- Cursor safety check: abort immediately if player is actively holding an item on cursor
+    if APIAdapter.GetCursorInfo() ~= nil then
+        NotifyCallback(callback, dispatchGlobalEvent, "CURSOR_LOCKED_ERROR")
+        return
+    end
+
+    -- Collect and sort tab indices
+    local tabs = {}
+    for tabIndex, _ in pairs(moveQueue) do
+        table.insert(tabs, tabIndex)
+    end
+    table.sort(tabs)
+
+    for _, tabIndex in ipairs(tabs) do
+        local tabQueue = moveQueue[tabIndex]
+
+        -- Switch tab if needed
+        local currentTab = (_G.GetCurrentGuildBankTab and _G.GetCurrentGuildBankTab()) or 1
+        if currentTab ~= tabIndex then
+            local tabLoaded = false
+            local eventFrame = nil
+            if _G.CreateFrame then
+                eventFrame = _G.CreateFrame("Frame")
+                eventFrame:RegisterEvent("GUILDBANKBAGSLOTS_CHANGED")
+                eventFrame:SetScript("OnEvent", function(self, event)
+                    tabLoaded = true
+                end)
+            else
+                tabLoaded = true -- Fallback for environments without CreateFrame
+            end
+
+            if _G.SetCurrentGuildBankTab then
+                _G.SetCurrentGuildBankTab(tabIndex)
+            end
+            if _G.QueryGuildBankTab then
+                _G.QueryGuildBankTab(tabIndex)
+            end
+
+            -- Yield until tab loaded or timeout (2 seconds)
+            local timeout = ((_G.GetTime and _G.GetTime()) or os.time()) + 2
+            while not tabLoaded and ((_G.GetTime and _G.GetTime()) or os.time()) < timeout do
+                coroutine.yield()
+            end
+
+            if eventFrame then
+                eventFrame:UnregisterAllEvents()
+                eventFrame:Hide()
+            end
+        end
+
+        -- Run the single-tab move inside the current coroutine
+        local tabFailed = false
+        local function innerCallback(event, ...)
+            if event == "DONE" then
+                -- Single-tab finished successfully
+            elseif event == "TIMEOUT_ERROR" or event == "CURSOR_LOCKED_ERROR" or event == "PERMISSION_ERROR" then
+                tabFailed = true
+                NotifyCallback(callback, dispatchGlobalEvent, event, ...)
+            else
+                NotifyCallback(callback, dispatchGlobalEvent, event, ...)
+            end
+        end
+
+        Mover.MoveThread(tabQueue, context, innerCallback, nil)
+
+        if tabFailed then
+            return -- Abort sequence if an error occurred
+        end
+    end
+
+    NotifyCallback(callback, dispatchGlobalEvent, "DONE")
+end
+
+--- Initiates a multi-tab move task.
+--- @param moveQueue table Map of tabIndex to single-tab MoveQueue
+--- @param context MoveContext Strategy context
+--- @param callback function? Per-move callback function
+--- @param dispatchGlobalEvent function? CallbackHandler dispatcher function
+function Mover.StartMultiTabMove(moveQueue, context, callback, dispatchGlobalEvent)
+    Scheduler.Start(Mover.MoveMultiTabThread, moveQueue, context, callback, dispatchGlobalEvent)
+end
+
 return Mover

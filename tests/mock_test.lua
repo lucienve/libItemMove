@@ -50,21 +50,140 @@ end
 
 local frameScript = nil
 local frameShown = false
+local registeredEvents = {}
+local pendingEvents = {}
+local activeGuildBankTab = 1
+local mockContainers
+
+local function ProcessMockEvents()
+    local events = pendingEvents
+    pendingEvents = {}
+    for _, event in ipairs(events) do
+        local frames = registeredEvents[event]
+        if frames then
+            for _, f in ipairs(frames) do
+                if f.onEvent then
+                    f:onEvent(event)
+                end
+            end
+        end
+    end
+end
 
 _G.CreateFrame = function(typeStr)
-    return {
-        Show = function(self) frameShown = true end,
-        Hide = function(self) frameShown = false end,
+    local f = {
+        Show = function(self)
+            if self.isScheduler then
+                frameShown = true
+            end
+        end,
+        Hide = function(self)
+            if self.isScheduler then
+                frameShown = false
+            end
+        end,
+        RegisterEvent = function(self, event)
+            if not registeredEvents[event] then
+                registeredEvents[event] = {}
+            end
+            table.insert(registeredEvents[event], self)
+        end,
+        UnregisterAllEvents = function(self)
+            for event, frames in pairs(registeredEvents) do
+                for i = #frames, 1, -1 do
+                    if frames[i] == self then
+                        table.remove(frames, i)
+                    end
+                end
+            end
+        end,
         SetScript = function(self, event, fn)
             if event == "OnUpdate" then
-                frameScript = fn
+                self.isScheduler = true
+                frameShown = true
+                frameScript = function(s, el)
+                    ProcessMockEvents()
+                    fn(s, el)
+                end
+            elseif event == "OnEvent" then
+                self.onEvent = fn
             end
         end
     }
+    return f
 end
 
+_G.GetCurrentGuildBankTab = function()
+    return activeGuildBankTab
+end
+
+_G.SetCurrentGuildBankTab = function(tab)
+    activeGuildBankTab = tab
+end
+
+_G.GetGuildBankTabInfo = function(tab)
+    return "Tab " .. tab, "icon", true, true, 10, -1
+end
+
+_G.QueryGuildBankTab = function(tab)
+    table.insert(pendingEvents, "GUILDBANKBAGSLOTS_CHANGED")
+end
+
+local mockGuildBank = {
+    [2] = {},
+    [3] = {}
+}
+
+_G.GetGuildBankItemInfo = function(tab, slot)
+    if mockGuildBank[tab] and mockGuildBank[tab][slot] then
+        local info = mockGuildBank[tab][slot]
+        return nil, info.stackCount or 0
+    end
+    return nil, 0
+end
+
+_G.GetGuildBankItemLink = function(tab, slot)
+    if mockGuildBank[tab] and mockGuildBank[tab][slot] then
+        local info = mockGuildBank[tab][slot]
+        if info.stackCount and info.stackCount > 0 then
+            return info.itemLink
+        end
+    end
+    return nil
+end
+
+_G.SplitGuildBankItem = function(tab, slot, count)
+    if mockGuildBank[tab] and mockGuildBank[tab][slot] then
+        local info = mockGuildBank[tab][slot]
+        cursorState = "item"
+        cursorItemId = info.itemID
+        info.heldSplit = count
+    end
+end
+
+_G.PickupGuildBankItem = function(tab, slot)
+    if cursorState == "item" then
+        cursorState = nil
+        cursorItemId = nil
+        
+        -- Find where the item came from or assume player backpack first slot
+        local srcInfo = mockContainers[0][1]
+        local movedQty = srcInfo.heldSplit or 10
+        srcInfo.stackCount = srcInfo.stackCount - movedQty
+        srcInfo.heldSplit = nil
+
+        if not mockGuildBank[tab] then mockGuildBank[tab] = {} end
+        mockGuildBank[tab][slot] = {
+            itemID = 12345,
+            stackCount = movedQty,
+            itemLink = "item:12345"
+        }
+    end
+end
+
+
 -- Mock Container Data
-local mockContainers = {
+mockContainers = {
     [0] = { -- Player Bag 0
         [1] = { itemID = 12345, stackCount = 20, isLocked = false, isBound = false, hyperLink = "item:12345" }
     },
@@ -262,5 +381,45 @@ assert(moveCompleted == true, "Move coroutine failed to complete within ticks")
 assert(mockContainers[0][1].stackCount == 5, "Source bag quantity failed to reduce to 5")
 assert(mockContainers[-1][1].stackCount == 15, "Destination bank quantity failed to reach 15")
 print("[PASS] Asynchronous Cooperative Move Execution test passed!")
+
+-- Test 10: Sequential Multi-Tab Guild Bank Movement
+mockContainers[0][1] = { itemID = 12345, stackCount = 20, isLocked = false, isBound = false, hyperLink = "item:12345" }
+mockGuildBank[2] = {}
+mockGuildBank[3] = {}
+activeGuildBankTab = 1
+
+local multiQueue = {
+    [2] = {
+        ["i:12345"] = 10
+    },
+    [3] = {
+        ["i:12345"] = 5
+    }
+}
+
+local multiProgressEvents = {}
+local multiMoveCompleted = false
+
+lib:Move(multiQueue, "BagToGuildBank", function(event, item, qty)
+    table.insert(multiProgressEvents, { event = event, item = item, qty = qty })
+    if event == "DONE" then
+        multiMoveCompleted = true
+    end
+end)
+
+-- Drive the coroutine through frame ticks
+local ticks = 0
+while frameShown and ticks < 50 do
+    ticks = ticks + 1
+    if frameScript then
+        frameScript(nil, 0.05)
+    end
+end
+
+assert(multiMoveCompleted == true, "Multi-tab move coroutine failed to complete")
+assert(mockContainers[0][1].stackCount == 5, "Multi-tab source bag stack count failed to reduce to 5")
+assert(mockGuildBank[2][1] and mockGuildBank[2][1].stackCount == 10, "Tab 2 target quantity failed to reach 10")
+assert(mockGuildBank[3][1] and mockGuildBank[3][1].stackCount == 5, "Tab 3 target quantity failed to reach 5")
+print("[PASS] Sequential Multi-Tab Guild Bank Movement test passed!")
 
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")

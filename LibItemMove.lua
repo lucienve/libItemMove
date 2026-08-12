@@ -93,7 +93,24 @@ function lib:Move(moveQueue, context, callback)
         error("LibItemMove:Move requires a valid MoveContext strategy.")
     end
 
-    Mover.StartMove(moveQueue, ctxObj, callback, DispatchGlobalEvent)
+    local isMultiTab = false
+    if ctxObj.isGuildBank then
+        for k, v in pairs(moveQueue) do
+            if type(k) == "number" and type(v) == "table" then
+                isMultiTab = true
+                break
+            end
+        end
+    end
+
+    if isMultiTab then
+        if type(Mover.StartMultiTabMove) ~= "function" then
+            error("LibItemMove: Mover.StartMultiTabMove is not implemented.")
+        end
+        Mover.StartMultiTabMove(moveQueue, ctxObj, callback, DispatchGlobalEvent)
+    else
+        Mover.StartMove(moveQueue, ctxObj, callback, DispatchGlobalEvent)
+    end
 end
 
 return lib

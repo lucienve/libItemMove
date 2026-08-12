@@ -51,7 +51,7 @@ Move operations require a `MoveContext` strategy object describing the transfer 
 | :--- | :--- | :--- |
 | `"BagToBank"` / `"bag_to_bank"` | `BagToBank` | Moves items from player Bags (`0..5`) to character Bank containers (`-1`, `6..12`). Consolidates partial stacks first. |
 | `"BankToBag"` / `"bank_to_bag"` | `BankToBag` | Moves items from character Bank containers (`-1`, `6..12`) to player Bags (`0..5`). Consolidates partial stacks first. |
-| `"BagToGuildBank"` / `"bag_to_guildbank"` | `BagToGuildBank` | Moves non-soulbound items from player Bags to Guild Bank. Checks deposit permissions and **enforces 1 move per yield cycle**. |
+| `"BagToGuildBank"` / `"bag_to_guildbank"` | `BagToGuildBank` | Moves non-soulbound items from player Bags to Guild Bank (either single active tab, or multiple tabs sequentially). Checks deposit permissions and **enforces 1 move per yield cycle**. |
 | `"GuildBankToBag"` / `"guildbank_to_bag"` | `GuildBankToBag` | Moves items from current Guild Bank tab to player Bags (`0..5`). Checks withdraw permissions and **enforces 1 move per yield cycle**. |
 | `"BagToWarbank"` / `"bag_to_warbank"` | `BagToWarbank` | Moves items from player Bags to account Warbank tabs (`13..17`). Consolidates partial stacks first. |
 | `"WarbankToBag"` / `"warbank_to_bag"` | `WarbankToBag` | Moves items from account Warbank tabs (`13..17`) to player Bags (`0..5`). Consolidates partial stacks first. |
@@ -153,6 +153,33 @@ LibItemMove:Move(moveQueue, "BagToGuildBank", function(event, item, qty)
         print("Guild Bank deposit progress:", item, qty)
     elseif event == "DONE" then
         print("Guild Bank deposit finished!")
+    end
+end)
+```
+
+### Example C.2: Sequential Multi-Tab Guild Bank Transfers
+
+You can deposit items into multiple specific guild bank tabs by formatting the `moveQueue` as a tab-keyed dictionary containing nested item-quantity structures:
+
+```lua
+-- Define specific tabs and item lists
+local multiTabQueue = {
+    [2] = {
+        ["i:20001"] = 20, -- Deposit 20 herbs to Tab 2
+    },
+    [3] = {
+        ["i:20002"] = 10, -- Deposit 10 ore to Tab 3
+    }
+}
+
+-- Execute multi-tab transfer
+LibItemMove:Move(multiTabQueue, "BagToGuildBank", function(event, item, qty)
+    if event == "PROGRESS" then
+        print(string.format("Moved %d of %s to current tab.", qty, item))
+    elseif event == "TIMEOUT_ERROR" then
+        print("|cffff0000Tab switch or transfer timed out! Sequence aborted.|r")
+    elseif event == "DONE" then
+        print("All multi-tab transfers finished successfully!")
     end
 end)
 ```
