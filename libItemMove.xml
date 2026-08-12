@@ -1,0 +1,20 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!-- Core Libraries -->
+    <Script file="core/types.lua"/>
+    <Script file="core/utils.lua"/>
+    <Script file="core/api_adapter.lua"/>
+    <Script file="core/scheduler.lua"/>
+
+    <!-- Context Strategies -->
+    <Script file="contexts/base_context.lua"/>
+    <Script file="contexts/bag_to_bank.lua"/>
+    <Script file="contexts/bank_to_bag.lua"/>
+    <Script file="contexts/bag_to_guildbank.lua"/>
+    <Script file="contexts/guildbank_to_bag.lua"/>
+    <Script file="contexts/bag_to_warbank.lua"/>
+    <Script file="contexts/warbank_to_bag.lua"/>
+
+    <!-- Mover & Library Entrypoint -->
+    <Script file="mover.lua"/>
+    <Script file="LibItemMove.lua"/>
+</Ui>

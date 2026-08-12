@@ -18,6 +18,24 @@ It provides utility functions for non-blocking item transfers between character 
 
 ---
 
+## Embedding in Your Addon
+
+Embed the library in your addon folder (e.g. `libs/LibItemMove-1.0`) and load it using one of the following methods:
+
+### Method A: TOC Reference
+Reference the library's `.toc` manifest in your addon's `.toc` file:
+```toc
+libs\LibItemMove-1.0\libItemMove.toc
+```
+
+### Method B: XML Include (Embedded Include Pattern)
+Include the library's XML manifest in your addon's XML layout file:
+```xml
+<Include file="libs/LibItemMove-1.0/libItemMove.xml"/>
+```
+
+---
+
 ## Quick Start Example
 
 ```lua

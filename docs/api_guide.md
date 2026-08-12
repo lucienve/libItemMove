@@ -33,6 +33,19 @@ libs\LibStub\LibStub.lua
 libs\LibItemMove-1.0\libItemMove.toc
 ```
 
+### Embedded Include Pattern (XML)
+Alternatively, if your addon uses an XML layout file (e.g. `bindings.xml` or custom layout manifests) to load dependencies, you can load `LibItemMove-1.0` using a single `<Include>` tag. This is particularly useful when embedding the library directly in your addon's subdirectories:
+
+```xml
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!-- Load LibItemMove-1.0 using the XML manifest -->
+    <Include file="libs/LibItemMove-1.0/libItemMove.xml"/>
+</Ui>
+```
+
+> [!NOTE]
+> Make sure `LibStub` is loaded before including `libItemMove.xml` so the library can register itself correctly.
+
 ### Acquiring the Library Instance
 Inside your Lua script, request the library from `LibStub`:
 

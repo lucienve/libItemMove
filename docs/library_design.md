@@ -215,3 +215,23 @@ Standard publicly-available libraries:
 *   **[AceTimer-3.0](https://www.wowace.com/projects/ace3)**: The standard scheduling library in WoW addon development. Ideal for handling delayed actions or retries if coroutines are not fully utilized.
 *   **Reference Codebases**: There are no monolithic library-wrapped APIs for bag/bank moves. However, the open-source sorting addon **[BankStack](https://github.com/kemayo/wow-bankstack)** is the community benchmark. Its codebase can be reviewed or vendored for mature sorting and stacking algorithms.
 
+---
+
+## 5. XML Manifest Loading (Embedded Include)
+
+To facilitate integration with parent addons that bundle dependencies internally, `LibItemMove-1.0` provides a standard XML manifest file (`libItemMove.xml`) in its root directory. This manifest follows the "Embedded Include" pattern, allowing the entire library to be loaded with a single `<Include>` tag.
+
+### Manifest File Order of Loading
+
+To satisfy internal code dependencies, the files must be loaded in the exact order shown below:
+
+1.  **Core Types (`core/types.lua`)**: Declares the addon namespace, class structures, metadata, and EmmyLua annotations. Must be loaded first.
+2.  **Utilities (`core/utils.lua`)**: Contains general-purpose helpers (e.g. packed slot encoding and decoding).
+3.  **API Adapter (`core/api_adapter.lua`)**: Adapts client APIs between classic Era/Vanilla and modern Retail containers (`C_Container`).
+4.  **Scheduler (`core/scheduler.lua`)**: Manages the cooperative coroutine execution flow using `OnUpdate` frame ticks.
+5.  **Context Strategies (`contexts/*`)**: Concrete strategy classes representing bag, bank, guildbank, and warbank movements.
+6.  **Core Mover (`mover.lua`)**: The core item mover implementation that handles slot pairing and transaction loop.
+7.  **Library Entrypoint (`LibItemMove.lua`)**: Registers the library with `LibStub` and instantiates the main interface.
+
+By standardizing this loading order via `libItemMove.xml`, parent addons can safely import the library without manually specifying the files or managing their load order in their TOC/XML lists.
+
