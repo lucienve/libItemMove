@@ -163,21 +163,25 @@ end
 
 _G.PickupGuildBankItem = function(tab, slot)
     if cursorState == "item" then
-        cursorState = nil
-        cursorItemId = nil
-        
-        -- Find where the item came from or assume player backpack first slot
         local srcInfo = mockContainers[0][1]
         local movedQty = srcInfo.heldSplit or 10
         srcInfo.stackCount = srcInfo.stackCount - movedQty
         srcInfo.heldSplit = nil
 
+        local id = cursorItemId or 12345
         if not mockGuildBank[tab] then mockGuildBank[tab] = {} end
-        mockGuildBank[tab][slot] = {
-            itemID = 12345,
-            stackCount = movedQty,
-            itemLink = "item:12345"
-        }
+        if mockGuildBank[tab][slot] and mockGuildBank[tab][slot].itemID == id then
+            mockGuildBank[tab][slot].stackCount = mockGuildBank[tab][slot].stackCount + movedQty
+        else
+            mockGuildBank[tab][slot] = {
+                itemID = id,
+                stackCount = movedQty,
+                itemLink = "item:" .. id
+            }
+        end
+
+        cursorState = nil
+        cursorItemId = nil
     end
 end
 
@@ -221,21 +225,27 @@ _G.C_Container = {
     end,
     PickupContainerItem = function(bag, slot)
         if cursorState == "item" then
-            cursorState = nil
-            cursorItemId = nil
             local srcInfo = mockContainers[0][1]
             local movedQty = srcInfo.heldSplit or 15
             srcInfo.stackCount = srcInfo.stackCount - movedQty
             srcInfo.heldSplit = nil
 
+            local id = cursorItemId or 12345
             if not mockContainers[bag] then mockContainers[bag] = {} end
-            mockContainers[bag][slot] = {
-                itemID = 12345,
-                stackCount = movedQty,
-                isLocked = false,
-                isBound = false,
-                hyperLink = "item:12345"
-            }
+            if mockContainers[bag][slot] and mockContainers[bag][slot].itemID == id then
+                mockContainers[bag][slot].stackCount = mockContainers[bag][slot].stackCount + movedQty
+            else
+                mockContainers[bag][slot] = {
+                    itemID = id,
+                    stackCount = movedQty,
+                    isLocked = false,
+                    isBound = false,
+                    hyperLink = "item:" .. id
+                }
+            end
+
+            cursorState = nil
+            cursorItemId = nil
         end
     end,
     ContainerIDToInventoryID = function(bag) return nil end
@@ -455,5 +465,35 @@ _G.C_Container.ContainerIDToInventoryID = originalContainerIDToInventoryID
 _G.GetInventoryItemID = originalGetInventoryItemID
 Private.APIAdapter.GetItemFamily = originalGetItemFamily
 print("[PASS] GetBagItemFamily Resolution test passed.")
+
+-- Test 12: Multi-Split Consolidation (First to partial stack, then remainder to empty slot)
+mockContainers[0] = {
+    [1] = { itemID = 888, stackCount = 20, isLocked = false, isBound = false, hyperLink = "item:888" }
+}
+mockGuildBank[2] = {
+    [1] = { itemID = 888, stackCount = 6, itemLink = "item:888", isLocked = false, isBound = false }
+}
+activeGuildBankTab = 2
+
+local test12Completed = false
+lib:Move({ ["i:888"] = 20 }, "BagToGuildBank", function(event)
+    if event == "DONE" then
+        test12Completed = true
+    end
+end)
+
+local ticks = 0
+while frameShown and ticks < 50 do
+    ticks = ticks + 1
+    if frameScript then
+        frameScript(nil, 0.05)
+    end
+end
+
+assert(test12Completed == true, "Test 12: Multi-split move failed to complete")
+assert(mockContainers[0][1] == nil or mockContainers[0][1].stackCount == 0, "Test 12: Source slot failed to be cleared")
+assert(mockGuildBank[2][1] and mockGuildBank[2][1].stackCount == 20, "Test 12: Target slot 1 failed to reach 20")
+assert(mockGuildBank[2][2] and mockGuildBank[2][2].stackCount == 6, "Test 12: Target slot 2 failed to receive remainder of 6")
+print("[PASS] Multi-Split Consolidation test passed.")
 
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")

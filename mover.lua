@@ -104,39 +104,46 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
             context:GetPartialSlots(itemString, partialSlots)
         end
 
+
+
         for _, srcIdx, currentQty in getIterator(context, itemString) do
+            local workingQty = currentQty
             if remainingToMove > 0 then
                 -- Try to merge into partial target stacks first
                 for pIdx, pData in ipairs(partialSlots) do
-                    if remainingToMove > 0 and pData.roomLeft > 0 then
-                        local moveQty = math.min(currentQty, remainingToMove, pData.roomLeft)
-                        pending[srcIdx] = {
+                    if remainingToMove > 0 and workingQty > 0 and pData.roomLeft > 0 then
+                        local moveQty = math.min(workingQty, remainingToMove, pData.roomLeft)
+                        table.insert(pending, {
+                            src = srcIdx,
                             target = pData.slotId,
                             qty = moveQty,
-                            endQty = math.max(currentQty - moveQty, 0),
+                            endQty = math.max(workingQty - moveQty, 0),
                             item = itemString,
                             isPartial = true,
                             expectedDestQty = pData.currentQty + moveQty
-                        }
+                        })
                         remainingToMove = remainingToMove - moveQty
+                        workingQty = workingQty - moveQty
                         pData.roomLeft = pData.roomLeft - moveQty
                     end
                 end
 
                 -- Step 2: Assign remaining quantity to empty slots
-                if remainingToMove > 0 and not pending[srcIdx] then
+                if remainingToMove > 0 and workingQty > 0 then
                     local targetSlotId = Mover.FindTargetSlot(itemString, emptySlots, context)
                     if targetSlotId then
-                        local moveQty = math.min(currentQty, remainingToMove)
-                        pending[srcIdx] = {
+                        local moveQty = math.min(workingQty, remainingToMove)
+                        table.insert(pending, {
+                            src = srcIdx,
                             target = targetSlotId,
                             qty = moveQty,
-                            endQty = math.max(currentQty - moveQty, 0),
+                            endQty = math.max(workingQty - moveQty, 0),
                             item = itemString,
                             isPartial = false,
                             expectedDestQty = moveQty
-                        }
+                        })
                         remainingToMove = remainingToMove - moveQty
+                        workingQty = workingQty - moveQty
                     end
                 end
             end
@@ -148,13 +155,13 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
         local movedSlotId = nil
 
         -- Execute move operations
-        for srcSlotId, moveData in pairs(pending) do
+        for moveIndex, moveData in pairs(pending) do
             if APIAdapter.GetCursorInfo() then
                 APIAdapter.ClearCursor()
             end
 
             -- Slot lock check: wait if source or target slot is locked in transit (with 5s timeout safety)
-            local sBag, sSlot = Utils.decode_bagslot(srcSlotId)
+            local sBag, sSlot = Utils.decode_bagslot(moveData.src)
             local tBag, tSlot = Utils.decode_bagslot(moveData.target)
             local lockTimeout = ((_G.GetTime and _G.GetTime()) or os.time()) + 5
             local isTimedOut = false
@@ -181,7 +188,7 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                 return
             end
 
-            context:MoveSlot(srcSlotId, moveData.target, moveData.qty)
+            context:MoveSlot(moveData.src, moveData.target, moveData.qty)
             coroutine.yield() -- Yield to allow WoW client to process click/packet
 
             -- Stuck Cursor Recovery (up to 10 retries with item ID validation)
@@ -203,7 +210,7 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
             end
 
             if context.isGuildBank then
-                movedSlotId = srcSlotId
+                movedSlotId = moveIndex
                 break -- Enforce Guild Bank throttling constraint: 1 move per yield cycle
             end
         end
@@ -214,13 +221,13 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
         local timeout = now + 5 -- 5 second timeout window
 
         while not didMove and (((_G.GetTime and _G.GetTime()) or os.time()) < timeout) do
-            for srcSlotId, moveData in pairs(pending) do
-                if not context.isGuildBank or srcSlotId == movedSlotId then
+            for moveIndex, moveData in pairs(pending) do
+                if not context.isGuildBank or moveIndex == movedSlotId then
                     local getSrcQty = context.GetSourceSlotQuantity or context.GetSlotQuantity
                     local getDestItemId = context.GetTargetSlotItemId or context.GetSlotItemId
                     local getDestQty = context.GetTargetSlotQuantity or context.GetSlotQuantity
 
-                    local srcQtyOk = getSrcQty(context, srcSlotId) <= moveData.endQty
+                    local srcQtyOk = getSrcQty(context, moveData.src) <= moveData.endQty
                     local tBag, tSlot = Utils.decode_bagslot(moveData.target)
                     local expectedId = context:GetItemIdFromString(moveData.item)
                     local destItemIdOk = (getDestItemId(context, tBag, tSlot) == expectedId)
@@ -229,7 +236,7 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
 
                     if srcQtyOk and destItemIdOk and destQtyOk and cursorOk then
                         didMove = true
-                        pending[srcSlotId] = nil
+                        pending[moveIndex] = nil
                         NotifyCallback(callback, dispatchGlobalEvent, "PROGRESS", moveData.item, moveData.qty)
                     end
                 end
@@ -242,8 +249,30 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
             coroutine.yield() -- Wait for next frame / server packet update
         end
 
+        if didMove and context.isGuildBank then
+            local waitTime = ((_G.GetTime and _G.GetTime()) or os.time()) + 0.2
+            while ((_G.GetTime and _G.GetTime()) or os.time()) < waitTime do
+                coroutine.yield()
+            end
+        end
+
         -- Handle timeout failures
         if not didMove then
+            for moveIndex, moveData in pairs(pending) do
+                if not context.isGuildBank or moveIndex == movedSlotId then
+                    local getSrcQty = context.GetSourceSlotQuantity or context.GetSlotQuantity
+                    local getDestItemId = context.GetTargetSlotItemId or context.GetSlotItemId
+                    local getDestQty = context.GetTargetSlotQuantity or context.GetSlotQuantity
+                    local tBag, tSlot = Utils.decode_bagslot(moveData.target)
+                    local sBag, sSlot = Utils.decode_bagslot(moveData.src)
+                    Private.DebugLog("TIMEOUT DETAILS: Item=%s, Qty=%s, Src=[%s,%s] (Qty left=%s, expected end=%s), Dest=[%s,%s] (ItemID=%s, Qty=%s, expected=%s), Cursor=%s",
+                        tostring(moveData.item), tostring(moveData.qty),
+                        tostring(sBag), tostring(sSlot), tostring(getSrcQty(context, moveData.src)), tostring(moveData.endQty),
+                        tostring(tBag), tostring(tSlot), tostring(getDestItemId(context, tBag, tSlot)), tostring(getDestQty(context, moveData.target)), tostring(moveData.expectedDestQty),
+                        tostring(APIAdapter.GetCursorInfo())
+                    )
+                end
+            end
             APIAdapter.ClearCursor()
             NotifyCallback(callback, dispatchGlobalEvent, "TIMEOUT_ERROR")
             break
