@@ -31,16 +31,33 @@ function Mover.FindTargetSlot(itemString, emptySlots, context)
     local itemID = Utils.GetItemIdFromString(itemString)
     local itemFamily = APIAdapter.GetItemFamily(itemID)
 
-    for idx, slotId in ipairs(emptySlots) do
-        local tBag, _ = Utils.decode_bagslot(slotId)
-        local bagFamily = APIAdapter.GetBagItemFamily(tBag)
+    if Private.DebugLog then
+        Private.DebugLog("FindTargetSlot(%s): itemID = %s, itemFamily = %s", tostring(itemString), tostring(itemID), tostring(itemFamily))
+    end
 
-        if Utils.IsFamilyCompatible(itemFamily, bagFamily) then
+    for idx, slotId in ipairs(emptySlots) do
+        local tBag, tSlot = Utils.decode_bagslot(slotId)
+        local bagFamily = APIAdapter.GetBagItemFamily(tBag)
+        local compatible = Utils.IsFamilyCompatible(itemFamily, bagFamily)
+
+        if Private.DebugLog then
+            Private.DebugLog("FindTargetSlot(%s): checking empty slot %d (bag %d, slot %d) with bagFamily = %s. Compatible = %s",
+                tostring(itemString), idx, tBag, tSlot, tostring(bagFamily), tostring(compatible))
+        end
+
+        if compatible then
+            if Private.DebugLog then
+                Private.DebugLog("FindTargetSlot(%s): matched compatible slot %d (bag %d, slot %d). Removing from empty slots.",
+                    tostring(itemString), idx, tBag, tSlot)
+            end
             table.remove(emptySlots, idx)
             return slotId
         end
     end
 
+    if Private.DebugLog then
+        Private.DebugLog("FindTargetSlot(%s): failed to find any compatible empty slots!", tostring(itemString))
+    end
     return nil
 end
 

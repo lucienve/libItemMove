@@ -58,6 +58,7 @@
 ---@field RegisterCallback fun(self: LibItemMove, event: string, method?: string|function, ...: any)
 ---@field UnregisterCallback fun(self: LibItemMove, event: string)
 ---@field UnregisterAllCallbacks fun(self: LibItemMove)
+---@field Debug boolean? Whether debug logs are enabled
 
 --- Private internal namespace shared across addon files
 ---@class LibItemMovePrivate
@@ -72,3 +73,4 @@
 ---@field BagToWarbank BaseContext Strategy for Bag -> Warbank
 ---@field WarbankToBag BaseContext Strategy for Warbank -> Bag
 ---@field Mover table Core mover engine module
+---@field DebugLog fun(fmt: string, ...: any) Internal debug log helper

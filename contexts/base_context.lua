@@ -125,14 +125,24 @@ function BaseContext:ScanEmptySlots(containers, emptySlotIdsTable)
     local specialtySlots = {}
     local generalSlots = {}
 
+    if Private.DebugLog then
+        Private.DebugLog("ScanEmptySlots: scanning %d containers...", #containers)
+    end
+
     for _, bag in ipairs(containers) do
         local bagFamily = APIAdapter.GetBagItemFamily(bag)
         local numSlots = GetContainerNumSlots(bag)
 
+        if Private.DebugLog then
+            Private.DebugLog("ScanEmptySlots: bag %d has family = %s, total slots = %d", bag, tostring(bagFamily), numSlots)
+        end
+
+        local emptyInBag = 0
         for slot = 1, numSlots do
             local info = APIAdapter.GetContainerItemInfo(bag, slot)
             if not info or info.stackCount == 0 then
                 local slotId = Utils.encode_bagslot(bag, slot)
+                emptyInBag = emptyInBag + 1
                 if bagFamily ~= 0 then
                     table.insert(specialtySlots, slotId)
                 else
@@ -140,6 +150,15 @@ function BaseContext:ScanEmptySlots(containers, emptySlotIdsTable)
                 end
             end
         end
+
+        if Private.DebugLog then
+            Private.DebugLog("ScanEmptySlots: bag %d had %d empty slots", bag, emptyInBag)
+        end
+    end
+
+    if Private.DebugLog then
+        Private.DebugLog("ScanEmptySlots: finished scanning. Specialty empty slots found: %d, General empty slots found: %d",
+            #specialtySlots, #generalSlots)
     end
 
     -- Specialized bags first, general bags second

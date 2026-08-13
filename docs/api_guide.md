@@ -16,6 +16,7 @@
    - [Example C: Depositing Items into Guild Bank (Rate-Limited)](#example-c-depositing-items-into-guild-bank-rate-limited)
    - [Example D: Transferring Items to Account Warbank](#example-d-transferring-items-to-account-warbank)
    - [Example E: Global Event Subscriptions via CallbackHandler-1.0](#example-e-global-event-subscriptions-via-callbackhandler-10)
+6. [Debugging & Diagnostic Logs](#6-debugging--diagnostic-logs)
 
 ---
 
@@ -230,3 +231,22 @@ end)
 -- Initiate move (events will be broadcast to MyWidget)
 LibItemMove:Move({ ["i:12345"] = 5 }, "BagToBank")
 ```
+
+---
+
+## 6. Debugging & Diagnostic Logs
+
+`LibItemMove-1.0` includes an optional diagnostic logging subsystem to help trace item family resolution, empty slot scanning, and compatibility checks. This is particularly useful for debugging why certain items (like trade goods or quest materials) are placed in general-purpose bags instead of specialty bags.
+
+### Enabling Verbosity
+You can enable log printing by setting the `Debug` property to `true` on the library instance before executing any move operations:
+
+```lua
+local LibItemMove = LibStub("LibItemMove-1.0")
+LibItemMove.Debug = true
+```
+
+When enabled, the library will log diagnostic messages directly to the default game chat frame (`DEFAULT_CHAT_FRAME`) or stdout. Diagnostic output includes:
+* **Bag Family Mapping**: Maps container indices to inventory slot IDs and prints the outcome of `GetInventoryItemID` or `GetInventoryItemLink` and the resolved bag family.
+* **Scan Empty Slots**: Lists which bags are checked, their capacity, resolved families, and how empty slots are prioritized.
+* **Slot Filtering**: Logs step-by-step evaluations of items checking against empty slots to trace why compatibilities fail or match.

@@ -422,4 +422,37 @@ assert(mockGuildBank[2][1] and mockGuildBank[2][1].stackCount == 10, "Tab 2 targ
 assert(mockGuildBank[3][1] and mockGuildBank[3][1].stackCount == 5, "Tab 3 target quantity failed to reach 5")
 print("[PASS] Sequential Multi-Tab Guild Bank Movement test passed!")
 
+-- Test 11: GetBagItemFamily Resolution
+local originalContainerIDToInventoryID = _G.C_Container.ContainerIDToInventoryID
+local originalGetInventoryItemID = _G.GetInventoryItemID
+local originalGetItemFamily = Private.APIAdapter.GetItemFamily
+
+_G.C_Container.ContainerIDToInventoryID = function(bag)
+    if bag == 5 then return 68 end -- Slot for Mammoth Mining Bag
+    return nil
+end
+
+_G.GetInventoryItemID = function(unit, slot)
+    if unit == "player" and slot == 68 then
+        return 44446 -- Mammoth Mining Bag Item ID
+    end
+    return nil
+end
+
+Private.APIAdapter.GetItemFamily = function(itemInput)
+    if itemInput == 44446 then
+        return 1024 -- Mining bag family
+    end
+    return 0
+end
+
+local family = Private.APIAdapter.GetBagItemFamily(5)
+assert(family == 1024, "GetBagItemFamily failed to resolve equipped bag family: expected 1024, got " .. tostring(family))
+
+-- Restore mocks
+_G.C_Container.ContainerIDToInventoryID = originalContainerIDToInventoryID
+_G.GetInventoryItemID = originalGetInventoryItemID
+Private.APIAdapter.GetItemFamily = originalGetItemFamily
+print("[PASS] GetBagItemFamily Resolution test passed.")
+
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")

@@ -16,3 +16,5 @@
 ## Completed Tasks
 - Added `libItemMove.xml` for support of the "Embedded Include" pattern.
 - Updated `docs/api_guide.md`, `docs/library_design.md`, and `README.md` to document the XML manifest usage and internal script loading order.
+- Fixed an issue in container family resolution where bag family checks would fail due to client-side item link caching latency by using `GetInventoryItemID` as the primary lookup method.
+- Introduced a diagnostic logging subsystem (`lib.Debug` and `Private.DebugLog`) to trace container family resolution, empty slot scanning, and item compatibility matching in real-time.

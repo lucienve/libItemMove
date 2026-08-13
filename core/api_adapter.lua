@@ -206,7 +206,12 @@ end
 --- @param bag number Container ID
 --- @return number family Specialty family bitmask (0 for general bags)
 function APIAdapter.GetBagItemFamily(bag)
-    if not bag or bag <= 0 then return 0 end
+    if not bag or bag <= 0 then
+        if Private.DebugLog then
+            Private.DebugLog("GetBagItemFamily(%s): bag ID is invalid/backpack (<= 0), returning 0", tostring(bag))
+        end
+        return 0
+    end
 
     local invID = nil
     if C_Container and C_Container.ContainerIDToInventoryID then
@@ -218,12 +223,49 @@ function APIAdapter.GetBagItemFamily(bag)
         end
     end
 
-    local getInvLink = _G["GetInventoryItemLink"]
-    if invID and getInvLink then
-        local bagLink = getInvLink("player", invID)
-        if bagLink then
-            return APIAdapter.GetItemFamily(bagLink)
+    if Private.DebugLog then
+        Private.DebugLog("GetBagItemFamily(%s): mapped to invID = %s", tostring(bag), tostring(invID))
+    end
+
+    if invID then
+        -- Query by numeric Item ID first: much more robust than link parsing and avoids caching/loading delays
+        local getInvItemID = _G["GetInventoryItemID"]
+        if getInvItemID then
+            local bagItemID = getInvItemID("player", invID)
+            if Private.DebugLog then
+                Private.DebugLog("GetBagItemFamily(%s): getInvItemID returned item ID = %s", tostring(bag), tostring(bagItemID))
+            end
+            if bagItemID and bagItemID > 0 then
+                local family = APIAdapter.GetItemFamily(bagItemID)
+                if Private.DebugLog then
+                    Private.DebugLog("GetBagItemFamily(%s): GetItemFamily of item ID %s returned family = %s", tostring(bag), tostring(bagItemID), tostring(family))
+                end
+                if family and family ~= 0 then
+                    return family
+                end
+            end
         end
+
+        -- Fallback to Item Link if ID querying returned 0 or wasn't available
+        local getInvLink = _G["GetInventoryItemLink"]
+        if getInvLink then
+            local bagLink = getInvLink("player", invID)
+            if Private.DebugLog then
+                Private.DebugLog("GetBagItemFamily(%s): getInvLink returned link = %s", tostring(bag), tostring(bagLink))
+            end
+            if bagLink then
+                local family = APIAdapter.GetItemFamily(bagLink)
+                if Private.DebugLog then
+                    Private.DebugLog("GetBagItemFamily(%s): GetItemFamily of item link returned family = %s", tostring(bag), tostring(family))
+                end
+                if family and family ~= 0 then
+                    return family
+                end
+            end
+        end
+    end
+    if Private.DebugLog then
+        Private.DebugLog("GetBagItemFamily(%s): failed to resolve family, returning 0", tostring(bag))
     end
     return 0
 end

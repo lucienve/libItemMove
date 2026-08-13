@@ -125,4 +125,20 @@ function Utils.IsFamilyCompatible(itemFamily, bagFamily)
     end
 end
 
+--- Logs a debug message if debugging is enabled.
+--- @param fmt string
+--- @param ... any
+function Private.DebugLog(fmt, ...)
+    local LibStub = _G.LibStub
+    local lib = LibStub and LibStub:GetLibrary("LibItemMove-1.0", true)
+    if lib and lib.Debug then
+        local msg = "[LibItemMove] " .. string.format(tostring(fmt), ...)
+        if _G.DEFAULT_CHAT_FRAME then
+            _G.DEFAULT_CHAT_FRAME:AddMessage(msg)
+        else
+            print(msg)
+        end
+    end
+end
+
 return Utils

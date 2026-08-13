@@ -113,4 +113,6 @@ function lib:Move(moveQueue, context, callback)
     end
 end
 
+lib.Debug = false
+
 return lib

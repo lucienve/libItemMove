@@ -15,6 +15,7 @@ It provides utility functions for non-blocking item transfers between character 
 * **Guild Bank Rate-Limit Throttling**: Limits Guild Bank transfers to 1 move per yield cycle to avoid server packet drops.
 * **Transaction Verification & Lock Recovery**: Verifies source quantity reduction and destination item ID matching with a 2-second timeout window and 10-retry stuck cursor recovery.
 * **Hybrid Callback System**: Supports per-transaction functional callbacks and Ace3 `CallbackHandler-1.0` event bus subscriptions.
+* **Diagnostic Debug Mode**: Exposes a `Debug` property on the library to print real-time traces of slot prioritization, bag family mapping, and compatibility checks.
 
 ---
 
