@@ -79,6 +79,13 @@ function BaseContext:GetTargetSlotQuantity(slotId)
     return self:GetSlotQuantity(slotId)
 end
 
+--- Returns specialty bag family bitmask for a container ID.
+--- @param bag number Container ID
+--- @return number family specialty family bitmask
+function BaseContext:GetBagFamily(bag)
+    return APIAdapter.GetBagItemFamily(bag)
+end
+
 --- Returns numeric item ID at bag & slot.
 --- @param bag number
 --- @param slot number
@@ -130,7 +137,7 @@ function BaseContext:ScanEmptySlots(containers, emptySlotIdsTable)
     end
 
     for _, bag in ipairs(containers) do
-        local bagFamily = APIAdapter.GetBagItemFamily(bag)
+        local bagFamily = self:GetBagFamily(bag)
         local numSlots = GetContainerNumSlots(bag)
 
         if Private.DebugLog then
@@ -182,7 +189,7 @@ function BaseContext:ScanPartialSlots(containers, itemString, partialSlotsTable)
     if maxStack <= 1 then return end -- Non-stackable items have no partial stacks
 
     for _, bag in ipairs(containers) do
-        local bagFamily = APIAdapter.GetBagItemFamily(bag)
+        local bagFamily = self:GetBagFamily(bag)
         local itemFamily = APIAdapter.GetItemFamily(itemID)
 
         if Utils.IsFamilyCompatible(itemFamily, bagFamily) then

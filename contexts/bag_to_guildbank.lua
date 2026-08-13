@@ -46,6 +46,13 @@ function BagToGuildBank:HasPermission()
     return true
 end
 
+--- Guild Bank tabs do not support specialty bag families; always returns 0.
+--- @param bag number Tab index
+--- @return number family 0
+function BagToGuildBank:GetBagFamily(bag)
+    return 0
+end
+
 --- Splits item from player bag slot and picks up on target Guild Bank tab slot.
 --- @param fromSlotId SlotId Packed source slot ID
 --- @param toSlotId SlotId Packed target slot ID
@@ -129,11 +136,15 @@ function BagToGuildBank:IsSourceSlotLocked(bag, slot)
     return info and info.isLocked or false
 end
 
---- Guild Bank slots do not support container item lock status; returns false.
+--- Checks if target Guild Bank tab slot is locked in transit.
 --- @param tab number
 --- @param slot number
 --- @return boolean isLocked
 function BagToGuildBank:IsTargetSlotLocked(tab, slot)
+    if _G.GetGuildBankItemInfo then
+        local _, _, locked = _G.GetGuildBankItemInfo(tab, slot)
+        return not not locked
+    end
     return false
 end
 

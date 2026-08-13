@@ -334,12 +334,13 @@ cursorState = nil
 cursorItemId = nil
 print("[PASS] Cursor Hold Early Abort test passed.")
 
--- Test 7: Guild Bank vs Player Bag API Mapping Isolation
+-- Test 7: Guild Bank vs Player Bag API Mapping test passed
 local b2gb = Private.BagToGuildBank
+local originalGetGuildBankItemInfo = _G.GetGuildBankItemInfo
 _G.GetGuildBankItemInfo = function(tab, slot) return nil, 77 end
 assert(b2gb:GetSourceSlotQuantity(lib.encode_bagslot(0, 1)) == 20, "BagToGuildBank source slot quantity must call container bag API")
 assert(b2gb:GetTargetSlotQuantity(lib.encode_bagslot(1, 1)) == 77, "BagToGuildBank target slot quantity must call Guild Bank API")
-_G.GetGuildBankItemInfo = nil
+_G.GetGuildBankItemInfo = originalGetGuildBankItemInfo
 print("[PASS] Guild Bank vs Player Bag API Mapping test passed.")
 
 -- Test 8: Scheduler Concurrency Protection

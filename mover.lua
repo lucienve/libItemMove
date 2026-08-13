@@ -37,7 +37,7 @@ function Mover.FindTargetSlot(itemString, emptySlots, context)
 
     for idx, slotId in ipairs(emptySlots) do
         local tBag, tSlot = Utils.decode_bagslot(slotId)
-        local bagFamily = APIAdapter.GetBagItemFamily(tBag)
+        local bagFamily = context:GetBagFamily(tBag)
         local compatible = Utils.IsFamilyCompatible(itemFamily, bagFamily)
 
         if Private.DebugLog then
@@ -115,7 +115,8 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                             qty = moveQty,
                             endQty = math.max(currentQty - moveQty, 0),
                             item = itemString,
-                            isPartial = true
+                            isPartial = true,
+                            expectedDestQty = pData.currentQty + moveQty
                         }
                         remainingToMove = remainingToMove - moveQty
                         pData.roomLeft = pData.roomLeft - moveQty
@@ -132,7 +133,8 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                             qty = moveQty,
                             endQty = math.max(currentQty - moveQty, 0),
                             item = itemString,
-                            isPartial = false
+                            isPartial = false,
+                            expectedDestQty = moveQty
                         }
                         remainingToMove = remainingToMove - moveQty
                     end
@@ -151,10 +153,10 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                 APIAdapter.ClearCursor()
             end
 
-            -- Slot lock check: wait if source or target slot is locked in transit (with 2s timeout safety)
+            -- Slot lock check: wait if source or target slot is locked in transit (with 5s timeout safety)
             local sBag, sSlot = Utils.decode_bagslot(srcSlotId)
             local tBag, tSlot = Utils.decode_bagslot(moveData.target)
-            local lockTimeout = ((_G.GetTime and _G.GetTime()) or os.time()) + 2
+            local lockTimeout = ((_G.GetTime and _G.GetTime()) or os.time()) + 5
             local isTimedOut = false
 
             while (context.IsSourceSlotLocked and context:IsSourceSlotLocked(sBag, sSlot)) or
@@ -209,20 +211,23 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
         -- Transaction verification phase
         local didMove = false
         local now = (_G.GetTime and _G.GetTime()) or os.time()
-        local timeout = now + 2 -- 2 second timeout window
+        local timeout = now + 5 -- 5 second timeout window
 
         while not didMove and (((_G.GetTime and _G.GetTime()) or os.time()) < timeout) do
             for srcSlotId, moveData in pairs(pending) do
                 if not context.isGuildBank or srcSlotId == movedSlotId then
                     local getSrcQty = context.GetSourceSlotQuantity or context.GetSlotQuantity
                     local getDestItemId = context.GetTargetSlotItemId or context.GetSlotItemId
+                    local getDestQty = context.GetTargetSlotQuantity or context.GetSlotQuantity
 
                     local srcQtyOk = getSrcQty(context, srcSlotId) <= moveData.endQty
                     local tBag, tSlot = Utils.decode_bagslot(moveData.target)
                     local expectedId = context:GetItemIdFromString(moveData.item)
                     local destItemIdOk = (getDestItemId(context, tBag, tSlot) == expectedId)
+                    local destQtyOk = getDestQty(context, moveData.target) >= moveData.expectedDestQty
+                    local cursorOk = APIAdapter.GetCursorInfo() == nil
 
-                    if srcQtyOk and destItemIdOk then
+                    if srcQtyOk and destItemIdOk and destQtyOk and cursorOk then
                         didMove = true
                         pending[srcSlotId] = nil
                         NotifyCallback(callback, dispatchGlobalEvent, "PROGRESS", moveData.item, moveData.qty)

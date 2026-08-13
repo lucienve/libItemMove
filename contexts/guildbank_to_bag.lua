@@ -108,11 +108,15 @@ function GuildBankToBag:GetSlotItemId(bag, slot)
     return self:GetTargetSlotItemId(bag, slot)
 end
 
---- Guild Bank slots do not support container item lock status; returns false.
+--- Checks if source Guild Bank tab slot is locked in transit.
 --- @param tab number
 --- @param slot number
 --- @return boolean isLocked
 function GuildBankToBag:IsSourceSlotLocked(tab, slot)
+    if _G.GetGuildBankItemInfo then
+        local _, _, locked = _G.GetGuildBankItemInfo(tab, slot)
+        return not not locked
+    end
     return false
 end
 
