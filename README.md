@@ -21,19 +21,19 @@ It provides utility functions for non-blocking item transfers between character 
 
 ## Embedding in Your Addon
 
-Embed the library in your addon folder (e.g. `libs/LibItemMove-1.0`) and load it using one of the following methods:
+Embed the library in your addon folder (e.g. `libs/LibItemMove-1.0`). The recommended and standard way to load embedded libraries in World of Warcraft is via an XML manifest:
 
-### Method A: TOC Reference
-Reference the library's `.toc` manifest in your addon's `.toc` file:
-```toc
-libs\LibItemMove-1.0\libItemMove.toc
-```
+### Recommended: XML Include Pattern
+Include the library's XML manifest in your addon's XML layout file (e.g. `embeds.xml` or custom manifest) after loading `LibStub`:
 
-### Method B: XML Include (Embedded Include Pattern)
-Include the library's XML manifest in your addon's XML layout file:
 ```xml
-<Include file="libs/LibItemMove-1.0/libItemMove.xml"/>
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Include file="libs/LibItemMove-1.0/libItemMove.xml"/>
+</Ui>
 ```
+
+> [!NOTE]
+> The World of Warcraft engine TOC parser only loads `.lua` and `.xml` files and does not support nested `.toc` manifests. Therefore, embedded libraries should always be loaded via XML `<Include>`. If your addon is pure Lua without an XML loader, you can directly list the library script files from `libItemMove.xml` in your parent addon's `.toc`.
 
 ---
 

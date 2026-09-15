@@ -37,6 +37,7 @@
 ---@field IsSlotLocked fun(self: MoveContext, bag: number, slot: number): boolean Returns true if item is locked in transit
 ---@field IsSourceSlotLocked fun(self: MoveContext, bag: number, slot: number): boolean Returns true if source item is locked in transit
 ---@field IsTargetSlotLocked fun(self: MoveContext, bag: number, slot: number): boolean Returns true if target item is locked in transit
+---@field GetBagFamily fun(self: MoveContext, bag: number): number Returns the item family bitmask for the specified bag
 ---@field HasPermission fun(self: MoveContext): boolean Returns true if player has permissions to perform moves in this context
 
 ---@class BaseContext : MoveContext
@@ -74,3 +75,64 @@
 ---@field WarbankToBag BaseContext Strategy for Warbank -> Bag
 ---@field Mover table Core mover engine module
 ---@field DebugLog fun(fmt: string, ...: any) Internal debug log helper
+
+-- ---------------------------------------------------------------------------
+-- Blizzard Engine Globals & Legacy API Signatures for LuaLS
+-- ---------------------------------------------------------------------------
+
+---@type MessageFrame?
+DEFAULT_CHAT_FRAME = DEFAULT_CHAT_FRAME
+
+---@type number?
+NUM_BAG_SLOTS = NUM_BAG_SLOTS
+
+---@type number?
+NUM_BANKBAGSLOTS = NUM_BANKBAGSLOTS
+
+---@type number?
+REAGENTBAG_CONTAINER = REAGENTBAG_CONTAINER
+
+---@type number?
+REAGENTBANK_CONTAINER = REAGENTBANK_CONTAINER
+
+---@type fun(bag: number): number?
+GetContainerNumSlots = GetContainerNumSlots
+
+---@type fun(bag: number, slot: number): any
+GetContainerItemInfo = GetContainerItemInfo
+
+---@type fun(bag: number, slot: number): number?
+GetContainerItemID = GetContainerItemID
+
+---@type fun(bag: number, slot: number, count: number)
+SplitContainerItem = SplitContainerItem
+
+---@type fun(bag: number, slot: number)
+PickupContainerItem = PickupContainerItem
+
+---@type fun(itemInput: string|number): number?
+GetItemFamily = GetItemFamily
+
+---@type fun(bag: number): number?
+ContainerIDToInventoryID = ContainerIDToInventoryID
+
+---@type fun(unit: string, invSlot: number): number?
+GetInventoryItemID = GetInventoryItemID
+
+---@type fun(unit: string, invSlot: number): string?
+GetInventoryItemLink = GetInventoryItemLink
+
+---@type fun(): boolean?
+IsReagentBankUnlocked = IsReagentBankUnlocked
+
+---@type fun(tab: number): string?, string?, boolean?, boolean?, number?, number?
+GetGuildBankTabInfo = GetGuildBankTabInfo
+
+---@type fun(): number?
+GetCurrentGuildBankTab = GetCurrentGuildBankTab
+
+---@type fun(tab: number)
+SetCurrentGuildBankTab = SetCurrentGuildBankTab
+
+---@type fun(tab: number)
+QueryGuildBankTab = QueryGuildBankTab

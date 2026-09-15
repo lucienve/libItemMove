@@ -110,7 +110,7 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
             local workingQty = currentQty
             if remainingToMove > 0 then
                 -- Try to merge into partial target stacks first
-                for pIdx, pData in ipairs(partialSlots) do
+                for _, pData in ipairs(partialSlots) do
                     if remainingToMove > 0 and workingQty > 0 and pData.roomLeft > 0 then
                         local moveQty = math.min(workingQty, remainingToMove, pData.roomLeft)
                         table.insert(pending, {
@@ -143,7 +143,6 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                             expectedDestQty = moveQty
                         })
                         remainingToMove = remainingToMove - moveQty
-                        workingQty = workingQty - moveQty
                     end
                 end
             end
@@ -192,7 +191,7 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
             coroutine.yield() -- Yield to allow WoW client to process click/packet
 
             -- Stuck Cursor Recovery (up to 10 retries with item ID validation)
-            local cursorType, cursorItemId = APIAdapter.GetCursorInfo()
+            local cursorType = APIAdapter.GetCursorInfo()
             if cursorType == "item" then
                 local retries = 0
                 local expectedId = Utils.GetItemIdFromString(moveData.item)
@@ -350,12 +349,10 @@ function Mover.MoveMultiTabThread(moveQueue, context, callback, dispatchGlobalEv
         -- Run the single-tab move inside the current coroutine
         local tabFailed = false
         local function innerCallback(event, ...)
-            if event == "DONE" then
-                -- Single-tab finished successfully
-            elseif event == "TIMEOUT_ERROR" or event == "CURSOR_LOCKED_ERROR" or event == "PERMISSION_ERROR" then
-                tabFailed = true
-                NotifyCallback(callback, dispatchGlobalEvent, event, ...)
-            else
+            if event ~= "DONE" then
+                if event == "TIMEOUT_ERROR" or event == "CURSOR_LOCKED_ERROR" or event == "PERMISSION_ERROR" then
+                    tabFailed = true
+                end
                 NotifyCallback(callback, dispatchGlobalEvent, event, ...)
             end
         end

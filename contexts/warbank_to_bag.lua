@@ -12,12 +12,35 @@ local WarbankToBag = BaseContext:New({
 }) --[[@as WarbankToBag]]
 Private.WarbankToBag = WarbankToBag
 
-WarbankToBag.WARBANK_CONTAINERS = { 13, 14, 15, 16, 17 }
+WarbankToBag.WARBANK_CONTAINERS = { 12, 13, 14, 15, 16 }
 
 --- Returns list of player bag IDs dynamically based on WoW client version.
 --- @return number[]
 function WarbankToBag:GetPlayerBags()
     return APIAdapter.GetPlayerBagIDs()
+end
+
+--- Returns list of active Warbank container IDs.
+--- @return number[]
+function WarbankToBag:GetWarbankContainers()
+    if C_Bank and C_Bank.FetchPurchasedBankTabIDs then
+        local bankTypeAccount = (Enum and Enum.BankType and Enum.BankType.Account) or 2
+        local tabs = C_Bank.FetchPurchasedBankTabIDs(bankTypeAccount)
+        if tabs and #tabs > 0 then
+            return tabs
+        end
+    end
+    return self.WARBANK_CONTAINERS
+end
+
+--- Checks if player can access the Account Warbank.
+--- @return boolean
+function WarbankToBag:HasPermission()
+    if C_Bank and C_Bank.CanUseBank then
+        local bankTypeAccount = (Enum and Enum.BankType and Enum.BankType.Account) or 2
+        return C_Bank.CanUseBank(bankTypeAccount)
+    end
+    return true
 end
 
 --- Splits item from Warbank slot and picks up on target bag slot.
@@ -72,7 +95,7 @@ end
 --- @param itemString string|number
 --- @return fun(): number?, SlotId?, number?
 function WarbankToBag:SlotIterator(itemString)
-    return self:ScanSourceSlots(self.WARBANK_CONTAINERS, itemString)
+    return self:ScanSourceSlots(self:GetWarbankContainers(), itemString)
 end
 
 WarbankToBag.SlotIdIterator = WarbankToBag.SlotIterator

@@ -21,21 +21,9 @@
 ---
 
 ## 1. Embedding in Your Addon
-
-### TOC Dependencies
-Include `LibStub` and `LibItemMove-1.0` in your addon's `.toc` file (or embed them in your `libs/` folder):
-
-```toc
-## Interface: 11503, 40400, 110002
-## Title: MyInventoryAddon
-## OptionalDeps: LibStub, LibItemMove-1.0
-
-libs\LibStub\LibStub.lua
-libs\LibItemMove-1.0\libItemMove.toc
-```
-
-### Embedded Include Pattern (XML)
-Alternatively, if your addon uses an XML layout file (e.g. `bindings.xml` or custom layout manifests) to load dependencies, you can load `LibItemMove-1.0` using a single `<Include>` tag. This is particularly useful when embedding the library directly in your addon's subdirectories:
+ 
+ ### XML Include Pattern (Recommended)
+ The recommended and standard way to embed `LibItemMove-1.0` in your addon is via an XML layout file (e.g. `embeds.xml` or custom manifest) using an `<Include>` tag:
 
 ```xml
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
@@ -45,7 +33,7 @@ Alternatively, if your addon uses an XML layout file (e.g. `bindings.xml` or cus
 ```
 
 > [!NOTE]
-> Make sure `LibStub` is loaded before including `libItemMove.xml` so the library can register itself correctly.
+> The World of Warcraft engine TOC parser only loads `.lua` and `.xml` files; it does not process nested `.toc` manifests. As with other major WoW libraries, embedded includes should be loaded via XML or by listing the files from `libItemMove.xml` directly in your parent TOC. Ensure `LibStub` is loaded prior to `libItemMove.xml`.
 
 ### Acquiring the Library Instance
 Inside your Lua script, request the library from `LibStub`:

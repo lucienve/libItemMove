@@ -19,7 +19,7 @@ local mockCallbackHandler = {}
 function mockCallbackHandler:New(target)
     target.registeredCallbacks = {}
     return {
-        Fire = function(self, event, ...)
+        Fire = function(_, event, ...)
             local cb = target.registeredCallbacks[event]
             if cb then cb(event, ...) end
         end
@@ -419,7 +419,7 @@ lib:Move(multiQueue, "BagToGuildBank", function(event, item, qty)
 end)
 
 -- Drive the coroutine through frame ticks
-local ticks = 0
+ticks = 0
 while frameShown and ticks < 50 do
     ticks = ticks + 1
     if frameScript then
@@ -482,7 +482,7 @@ lib:Move({ ["i:888"] = 20 }, "BagToGuildBank", function(event)
     end
 end)
 
-local ticks = 0
+ticks = 0
 while frameShown and ticks < 50 do
     ticks = ticks + 1
     if frameScript then
@@ -495,5 +495,42 @@ assert(mockContainers[0][1] == nil or mockContainers[0][1].stackCount == 0, "Tes
 assert(mockGuildBank[2][1] and mockGuildBank[2][1].stackCount == 20, "Test 12: Target slot 1 failed to reach 20")
 assert(mockGuildBank[2][2] and mockGuildBank[2][2].stackCount == 6, "Test 12: Target slot 2 failed to receive remainder of 6")
 print("[PASS] Multi-Split Consolidation test passed.")
+
+-- Test 13: Centralized APIAdapter.GetContainerNumSlots Resolution
+assert(Private.APIAdapter.GetContainerNumSlots(0) == 4, "Test 13: Bag 0 slots failed, expected 4")
+assert(Private.APIAdapter.GetContainerNumSlots(-1) == 4, "Test 13: Bank slots failed, expected 4")
+assert(Private.APIAdapter.GetContainerNumSlots(99) == 0, "Test 13: Nonexistent container should return 0")
+print("[PASS] APIAdapter.GetContainerNumSlots Resolution test passed.")
+
+-- Test 14: Warbank & Modern Character Bank Container Resolution
+local b2w = Private.BagToWarbank
+local w2b = Private.WarbankToBag
+assert(b2w.WARBANK_CONTAINERS[1] == 12 and b2w.WARBANK_CONTAINERS[5] == 16, "Test 14: BagToWarbank default containers should be 12..16")
+assert(w2b.WARBANK_CONTAINERS[1] == 12 and w2b.WARBANK_CONTAINERS[5] == 16, "Test 14: WarbankToBag default containers should be 12..16")
+
+-- Test dynamic C_Bank querying
+_G.C_Bank = {
+    FetchPurchasedBankTabIDs = function(bankType)
+        if bankType == 2 then -- Enum.BankType.Account
+            return { 12, 13 }
+        elseif bankType == 0 then -- Enum.BankType.Character
+            return { 6, 7, 8 }
+        end
+        return {}
+    end,
+    CanUseBank = function(bankType)
+        return bankType == 2
+    end
+}
+
+local activeWarbankTabs = b2w:GetWarbankContainers()
+assert(#activeWarbankTabs == 2 and activeWarbankTabs[1] == 12 and activeWarbankTabs[2] == 13, "Test 14: Dynamic Warbank tab query failed")
+assert(b2w:HasPermission() == true, "Test 14: Warbank permission check failed")
+
+local modernBankTabs = Private.APIAdapter.GetBankContainerIDs()
+assert(#modernBankTabs == 3 and modernBankTabs[1] == 6 and modernBankTabs[3] == 8, "Test 14: Dynamic modern bank tabs query failed")
+
+_G.C_Bank = nil
+print("[PASS] Warbank & Modern Character Bank Container Resolution test passed.")
 
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")

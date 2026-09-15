@@ -18,27 +18,12 @@ function BagToGuildBank:GetPlayerBags()
     return APIAdapter.GetPlayerBagIDs()
 end
 
---- Helper function to safely query slot count across WoW versions.
---- @param bag number Container ID
---- @return number numSlots
-local function GetContainerNumSlots(bag)
-    local cContainer = _G["C_Container"]
-    if cContainer and cContainer.GetContainerNumSlots then
-        return cContainer.GetContainerNumSlots(bag) or 0
-    end
-    local legacyGetNumSlots = _G["GetContainerNumSlots"]
-    if legacyGetNumSlots then
-        return legacyGetNumSlots(bag) or 0
-    end
-    return 0
-end
-
 --- Checks if the player has deposit permissions on the current Guild Bank tab.
 --- @return boolean hasPermission
 function BagToGuildBank:HasPermission()
     local currentTab = (_G.GetCurrentGuildBankTab and _G.GetCurrentGuildBankTab()) or 1
     if _G.GetGuildBankTabInfo then
-        local name, icon, isViewable, canDeposit, numWithdrawals, remainingWithdrawals = _G.GetGuildBankTabInfo(currentTab)
+        local _, _, isViewable, canDeposit = _G.GetGuildBankTabInfo(currentTab)
         if isViewable ~= nil and not canDeposit then
             return false
         end
@@ -199,7 +184,7 @@ function BagToGuildBank:SlotIterator(itemString)
     local slotList = {}
 
     for _, bag in ipairs(self:GetPlayerBags()) do
-        local numSlots = GetContainerNumSlots(bag)
+        local numSlots = APIAdapter.GetContainerNumSlots(bag)
 
         for slot = 1, numSlots do
             local info = APIAdapter.GetContainerItemInfo(bag, slot)

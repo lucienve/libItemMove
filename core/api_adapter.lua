@@ -23,12 +23,32 @@ end
 
 --- Returns list of character bank container IDs dynamically based on WoW version.
 --- Classic Era: -1 (BANK_CONTAINER) + Bank Bags 5..11
---- Modern Retail: -1 (BANK_CONTAINER) + -3 (REAGENTBANK_CONTAINER) + Bank Bags 6..12
+--- Modern Retail (11.0+): CharacterBankTab_1..6 (6..11) or dynamically queried via C_Bank
 --- @return number[] bankContainers
 function APIAdapter.GetBankContainerIDs()
+    -- Modern Retail with Account / Character Bank tabs (11.0+)
+    if C_Bank and C_Bank.FetchPurchasedBankTabIDs then
+        local bankTypeCharacter = (Enum and Enum.BankType and Enum.BankType.Character) or 0
+        local tabs = C_Bank.FetchPurchasedBankTabIDs(bankTypeCharacter)
+        if tabs and #tabs > 0 then
+            return tabs
+        end
+    end
+
+    if Enum and Enum.BagIndex and Enum.BagIndex.CharacterBankTab_1 then
+        local tabs = {}
+        local firstTab = Enum.BagIndex.CharacterBankTab_1
+        local lastTab = Enum.BagIndex.CharacterBankTab_6 or (firstTab + 5)
+        for i = firstTab, lastTab do
+            table.insert(tabs, i)
+        end
+        return tabs
+    end
+
+    -- Classic / Legacy Bank layout
     local containers = { -1 }
 
-    -- Reagent Bank (-3) in Retail / modern expansions
+    -- Reagent Bank (-3) in legacy expansions (WoD through Shadowlands)
     local isUnlockedFn = _G["IsReagentBankUnlocked"]
     if _G["REAGENTBANK_CONTAINER"] or (type(isUnlockedFn) == "function" and isUnlockedFn()) then
         table.insert(containers, -3)
@@ -71,7 +91,7 @@ function APIAdapter.GetContainerItemInfo(bag, slot)
     -- Fallback for Classic Era GetContainerItemInfo
     local legacyGetInfo = _G["GetContainerItemInfo"]
     if legacyGetInfo then
-        local ret1, count, locked, quality, readable, lootable, link, isFiltered, noValue, itemID, isBound = legacyGetInfo(bag, slot)
+        local ret1, count, locked, _, _, _, link, _, _, itemID, isBound = legacyGetInfo(bag, slot)
 
         -- Safeguard: If GetContainerItemInfo returned a single table (e.g. redirected by another addon or wrapper)
         if type(ret1) == "table" then
@@ -110,6 +130,20 @@ function APIAdapter.GetContainerItemID(bag, slot)
     end
     local info = APIAdapter.GetContainerItemInfo(bag, slot)
     return info and info.itemID
+end
+
+--- Returns total number of slots in a container.
+--- @param bag number Container ID
+--- @return number numSlots
+function APIAdapter.GetContainerNumSlots(bag)
+    if C_Container and C_Container.GetContainerNumSlots then
+        return C_Container.GetContainerNumSlots(bag) or 0
+    end
+    local legacyGetNumSlots = _G["GetContainerNumSlots"]
+    if legacyGetNumSlots then
+        return legacyGetNumSlots(bag) or 0
+    end
+    return 0
 end
 
 --- Splits quantity from bag slot onto cursor.
@@ -192,10 +226,8 @@ function APIAdapter.GetItemFamily(itemInput)
         if family then return family end
     end
     -- Fallback for legacy Classic client API where GetItemFamily is global
-    ---@diagnostic disable-next-line: deprecated
     local legacyGetFamily = _G["GetItemFamily"]
     if legacyGetFamily then
-        ---@diagnostic disable-next-line: deprecated
         local family = legacyGetFamily(itemInput)
         if family then return family end
     end

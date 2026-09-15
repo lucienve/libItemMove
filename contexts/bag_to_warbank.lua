@@ -12,12 +12,35 @@ local BagToWarbank = BaseContext:New({
 }) --[[@as BagToWarbank]]
 Private.BagToWarbank = BagToWarbank
 
-BagToWarbank.WARBANK_CONTAINERS = { 13, 14, 15, 16, 17 }
+BagToWarbank.WARBANK_CONTAINERS = { 12, 13, 14, 15, 16 }
 
 --- Returns list of player bag IDs dynamically based on WoW client version.
 --- @return number[]
 function BagToWarbank:GetPlayerBags()
     return APIAdapter.GetPlayerBagIDs()
+end
+
+--- Returns list of active Warbank container IDs.
+--- @return number[]
+function BagToWarbank:GetWarbankContainers()
+    if C_Bank and C_Bank.FetchPurchasedBankTabIDs then
+        local bankTypeAccount = (Enum and Enum.BankType and Enum.BankType.Account) or 2
+        local tabs = C_Bank.FetchPurchasedBankTabIDs(bankTypeAccount)
+        if tabs and #tabs > 0 then
+            return tabs
+        end
+    end
+    return self.WARBANK_CONTAINERS
+end
+
+--- Checks if player can access the Account Warbank.
+--- @return boolean
+function BagToWarbank:HasPermission()
+    if C_Bank and C_Bank.CanUseBank then
+        local bankTypeAccount = (Enum and Enum.BankType and Enum.BankType.Account) or 2
+        return C_Bank.CanUseBank(bankTypeAccount)
+    end
+    return true
 end
 
 --- Splits item from player bag slot and picks up on target Warbank slot.
@@ -58,14 +81,14 @@ end
 --- Retrieves list of empty slot IDs in destination Warbank tabs sorted by family.
 --- @param emptySlotIdsTable SlotId[] Array to populate
 function BagToWarbank:GetEmptySlots(emptySlotIdsTable)
-    self:ScanEmptySlots(self.WARBANK_CONTAINERS, emptySlotIdsTable)
+    self:ScanEmptySlots(self:GetWarbankContainers(), emptySlotIdsTable)
 end
 
 --- Retrieves list of partial stack slots in destination Warbank tabs.
 --- @param itemString string|number
 --- @param partialSlotsTable table[]
 function BagToWarbank:GetPartialSlots(itemString, partialSlotsTable)
-    self:ScanPartialSlots(self.WARBANK_CONTAINERS, itemString, partialSlotsTable)
+    self:ScanPartialSlots(self:GetWarbankContainers(), itemString, partialSlotsTable)
 end
 
 --- Iterates player bag slots containing specified item.

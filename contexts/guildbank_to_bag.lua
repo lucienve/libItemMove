@@ -23,7 +23,7 @@ end
 function GuildBankToBag:HasPermission()
     local currentTab = (_G.GetCurrentGuildBankTab and _G.GetCurrentGuildBankTab()) or 1
     if _G.GetGuildBankTabInfo then
-        local name, icon, isViewable, canDeposit, numWithdrawals, remainingWithdrawals = _G.GetGuildBankTabInfo(currentTab)
+        local _, _, isViewable, _, numWithdrawals, remainingWithdrawals = _G.GetGuildBankTabInfo(currentTab)
         if isViewable ~= nil then
             local canWithdraw = (numWithdrawals and numWithdrawals > 0) or (remainingWithdrawals and (remainingWithdrawals > 0 or remainingWithdrawals == -1))
             if not canWithdraw then

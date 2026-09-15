@@ -110,21 +110,6 @@ function BaseContext:GetTargetSlotItemId(bag, slot)
     return self:GetSlotItemId(bag, slot)
 end
 
---- Helper function to safely query slot count across WoW versions.
---- @param bag number Container ID
---- @return number numSlots
-local function GetContainerNumSlots(bag)
-    local cContainer = _G["C_Container"]
-    if cContainer and cContainer.GetContainerNumSlots then
-        return cContainer.GetContainerNumSlots(bag) or 0
-    end
-    local legacyGetNumSlots = _G["GetContainerNumSlots"]
-    if legacyGetNumSlots then
-        return legacyGetNumSlots(bag) or 0
-    end
-    return 0
-end
-
 --- Shared helper to scan containers and retrieve empty slots sorted by family (specialty first).
 --- @param containers number[] List of bag/container IDs to scan
 --- @param emptySlotIdsTable SlotId[] Destination array to append packed SlotIds
@@ -138,7 +123,7 @@ function BaseContext:ScanEmptySlots(containers, emptySlotIdsTable)
 
     for _, bag in ipairs(containers) do
         local bagFamily = self:GetBagFamily(bag)
-        local numSlots = GetContainerNumSlots(bag)
+        local numSlots = APIAdapter.GetContainerNumSlots(bag)
 
         if Private.DebugLog then
             Private.DebugLog("ScanEmptySlots: bag %d has family = %s, total slots = %d", bag, tostring(bagFamily), numSlots)
@@ -193,7 +178,7 @@ function BaseContext:ScanPartialSlots(containers, itemString, partialSlotsTable)
         local itemFamily = APIAdapter.GetItemFamily(itemID)
 
         if Utils.IsFamilyCompatible(itemFamily, bagFamily) then
-            local numSlots = GetContainerNumSlots(bag)
+            local numSlots = APIAdapter.GetContainerNumSlots(bag)
             for slot = 1, numSlots do
                 local info = APIAdapter.GetContainerItemInfo(bag, slot)
                 if info and info.stackCount > 0 and info.stackCount < maxStack then
@@ -226,7 +211,7 @@ function BaseContext:ScanSourceSlots(containers, itemString)
     local slotList = {}
 
     for _, bag in ipairs(containers) do
-        local numSlots = GetContainerNumSlots(bag)
+        local numSlots = APIAdapter.GetContainerNumSlots(bag)
 
         for slot = 1, numSlots do
             local info = APIAdapter.GetContainerItemInfo(bag, slot)
