@@ -10,7 +10,7 @@ It provides utility functions for non-blocking item transfers between character 
 
 * **Non-Blocking Cooperative Execution**: Uses a coroutine scheduler backed by frame `OnUpdate` ticks to prevent frame drops or game client freezes during large stack moves.
 * **Modern Packed `SlotId` Standard**: Encodes slots as single packed integers `(BagID * 1000) + SlotIndex` to prevent GC memory allocation spikes and slot collisions in modern 100+ slot containers.
-* **Cross-Version API Adapter**: Tailored primarily for **Classic Era (1.15.x)** while supporting Cataclysm/Wrath Classic and modern **Retail (11.x `C_Container`)**.
+* **Cross-Version API Adapter**: Seamlessly supports **Classic Era (1.15.x)**, **Mists of Pandaria Classic (5.5.x)**, and modern **Retail (11.x/12.x `C_Container`)**.
 * **Specialty Bag Prioritization**: Automatically sorts empty destination slots, placing items into specialty bags (Herb, Mining, Reagent bags) before general bags.
 * **Guild Bank Rate-Limit Throttling**: Limits Guild Bank transfers to 1 move per yield cycle to avoid server packet drops.
 * **Transaction Verification & Lock Recovery**: Verifies source quantity reduction and destination item ID matching with a 2-second timeout window and 10-retry stuck cursor recovery.
