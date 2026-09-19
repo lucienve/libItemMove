@@ -1,4 +1,4 @@
-## Interface: 11509, 50504, 120007
+## Interface: 16001, 120100, 50504, 11509
 ## Title: LibItemMove-1.0
 ## Notes: Library for asynchronous, cooperative item movement between bags, banks, warbanks, and guild banks.
 ## Author: Lucien
