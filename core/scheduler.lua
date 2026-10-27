@@ -6,17 +6,6 @@ Private.Scheduler = Scheduler
 
 local frame = nil
 
---- Ensures hidden frame creation and script wiring for OnUpdate.
-local function EnsureFrame()
-    if not frame and _G.CreateFrame then
-        frame = _G.CreateFrame("Frame")
-        frame:Hide()
-        frame:SetScript("OnUpdate", function(self, elapsed)
-            Scheduler.Tick()
-        end)
-    end
-end
-
 --- Executes a single coroutine tick on frame update.
 function Scheduler.Tick()
     if not Scheduler.active or not Scheduler.thread then
@@ -42,6 +31,15 @@ function Scheduler.Tick()
         Scheduler.thread = nil
         if frame then frame:Hide() end
         error("LibItemMove Coroutine Error: " .. tostring(err))
+    end
+end
+
+--- Ensures hidden frame creation and script wiring for OnUpdate.
+local function EnsureFrame()
+    if not frame and _G.CreateFrame then
+        frame = _G.CreateFrame("Frame")
+        frame:Hide()
+        frame:SetScript("OnUpdate", Scheduler.Tick)
     end
 end
 

@@ -189,7 +189,7 @@ end
 -- Mock Container Data
 mockContainers = {
     [0] = { -- Player Bag 0
-        [1] = { itemID = 12345, stackCount = 20, isLocked = false, isBound = false, hyperLink = "item:12345" }
+        [1] = { itemID = 12345, stackCount = 20, isLocked = false, isBound = false, hyperlink = "item:12345" }
     },
     [-1] = { -- Bank Main Container
         [1] = { itemID = nil, stackCount = 0, isLocked = false, isBound = false }
@@ -240,7 +240,7 @@ _G.C_Container = {
                     stackCount = movedQty,
                     isLocked = false,
                     isBound = false,
-                    hyperLink = "item:" .. id
+                    hyperlink = "item:" .. id
                 }
             end
 
@@ -300,9 +300,44 @@ local bankContainers = Private.APIAdapter.GetBankContainerIDs()
 assert(bankContainers[1] == -1 and bankContainers[2] == 5, "Classic Era bank containers resolution failed: expected 5 to be first bank bag")
 print("[PASS] Dynamic Classic Era Container ID Resolution test passed.")
 
+-- Test 2b: Reagent Bank (-3) Guard & Retail Reagent Bag Resolution
+_G.REAGENTBANK_CONTAINER = -3
+local bankContainersMists = Private.APIAdapter.GetBankContainerIDs()
+local hasReagentBankMists = false
+for _, id in ipairs(bankContainersMists) do
+    if id == -3 then hasReagentBankMists = true end
+end
+assert(hasReagentBankMists == false, "Mists Classic must not include Reagent Bank (-3) when IsReagentBankUnlocked is absent")
+
+_G.IsReagentBankUnlocked = function() return false end
+local bankContainersLocked = Private.APIAdapter.GetBankContainerIDs()
+local hasReagentBankLocked = false
+for _, id in ipairs(bankContainersLocked) do
+    if id == -3 then hasReagentBankLocked = true end
+end
+assert(hasReagentBankLocked == false, "Reagent Bank (-3) must not be included when IsReagentBankUnlocked returns false")
+
+_G.IsReagentBankUnlocked = function() return true end
+local bankContainersUnlocked = Private.APIAdapter.GetBankContainerIDs()
+local hasReagentBankUnlocked = false
+for _, id in ipairs(bankContainersUnlocked) do
+    if id == -3 then hasReagentBankUnlocked = true end
+end
+assert(hasReagentBankUnlocked == true, "Reagent Bank (-3) must be included when IsReagentBankUnlocked returns true")
+_G.IsReagentBankUnlocked = nil
+_G.REAGENTBANK_CONTAINER = nil
+
+_G.NUM_REAGENTBAG_SLOTS = 1
+local playerBagsRetail = Private.APIAdapter.GetPlayerBagIDs()
+assert(#playerBagsRetail == 6 and playerBagsRetail[6] == 5, "Retail player bags must include bag 5 when NUM_REAGENTBAG_SLOTS == 1")
+local bankContainersRetail = Private.APIAdapter.GetBankContainerIDs()
+assert(bankContainersRetail[1] == -1 and bankContainersRetail[2] == 6, "Retail bank bags must start at 6 when NUM_REAGENTBAG_SLOTS == 1")
+_G.NUM_REAGENTBAG_SLOTS = nil
+print("[PASS] Reagent Bank (-3) Guard & Retail Reagent Bag Resolution test passed.")
+
 -- Test 3: Robust Single-Table Return Protection for GetContainerItemInfo
 local rawSingleTableHook = function(bag, slot)
-    return { itemID = 555, stackCount = 10, isBound = true, hyperLink = "item:555" }
+    return { itemID = 555, stackCount = 10, isBound = true, hyperlink = "item:555" }
 end
 
 _G.GetContainerItemInfo = rawSingleTableHook
@@ -310,10 +345,14 @@ local tmpCContainer = _G.C_Container
 _G.C_Container = nil -- Simulate legacy environment with overridden GetContainerItemInfo
 
 local infoSingle = Private.APIAdapter.GetContainerItemInfo(1, 1)
-assert(infoSingle ~= nil and infoSingle.itemID == 555 and infoSingle.isBound == true, "Single-table fallback hook protection failed!")
+assert(infoSingle ~= nil and infoSingle.itemID == 555 and infoSingle.isBound == true and infoSingle.itemLink == "item:555", "Single-table fallback hook protection failed!")
 _G.C_Container = tmpCContainer
 _G.GetContainerItemInfo = nil
-print("[PASS] Single-table return protection test passed.")
+
+-- Test C_Container lowercase hyperlink normalization
+local adapterInfo = Private.APIAdapter.GetContainerItemInfo(0, 1)
+assert(adapterInfo ~= nil and adapterInfo.itemLink == "item:12345", "APIAdapter failed to normalize lowercase hyperlink to itemLink")
+print("[PASS] Single-table return protection and lowercase hyperlink normalization test passed.")
 
 -- Test 4: Item ID Parsing & Strict Matching
 local id1 = Private.Utils.GetItemIdFromString("i:12345")
@@ -394,7 +433,7 @@ assert(mockContainers[-1][1].stackCount == 15, "Destination bank quantity failed
 print("[PASS] Asynchronous Cooperative Move Execution test passed!")
 
 -- Test 10: Sequential Multi-Tab Guild Bank Movement
-mockContainers[0][1] = { itemID = 12345, stackCount = 20, isLocked = false, isBound = false, hyperLink = "item:12345" }
+mockContainers[0][1] = { itemID = 12345, stackCount = 20, isLocked = false, isBound = false, hyperlink = "item:12345" }
 mockGuildBank[2] = {}
 mockGuildBank[3] = {}
 activeGuildBankTab = 1
@@ -468,7 +507,7 @@ print("[PASS] GetBagItemFamily Resolution test passed.")
 
 -- Test 12: Multi-Split Consolidation (First to partial stack, then remainder to empty slot)
 mockContainers[0] = {
-    [1] = { itemID = 888, stackCount = 20, isLocked = false, isBound = false, hyperLink = "item:888" }
+    [1] = { itemID = 888, stackCount = 20, isLocked = false, isBound = false, hyperlink = "item:888" }
 }
 mockGuildBank[2] = {
     [1] = { itemID = 888, stackCount = 6, itemLink = "item:888", isLocked = false, isBound = false }

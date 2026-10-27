@@ -1,6 +1,10 @@
 # LibItemMove-1.0 Developer API Guide
 
-`LibItemMove-1.0` is an asynchronous, cooperative item movement library for World of Warcraft addons. It enables non-blocking item transfers between player character bags, character bank, Guild Bank, and account Warbanks while respecting client/server latency, rate limits, specialty bag restrictions, and cursor safety.
+`LibItemMove-1.0` is an asynchronous, cooperative item movement library for
+World of Warcraft addons. It enables non-blocking item transfers between player
+character bags, character bank, Guild Bank, and account Warbanks while
+respecting client/server latency, rate limits, specialty bag restrictions, and
+cursor safety.
 
 ---
 
@@ -21,9 +25,12 @@
 ---
 
 ## 1. Embedding in Your Addon
- 
- ### XML Include Pattern (Recommended)
- The recommended and standard way to embed `LibItemMove-1.0` in your addon is via an XML layout file (e.g. `embeds.xml` or custom manifest) using an `<Include>` tag:
+
+### XML Include Pattern (Recommended)
+
+The recommended and standard way to embed `LibItemMove-1.0` in your addon is via
+an XML layout file (e.g. `embeds.xml` or custom manifest) using an `<Include>`
+tag:
 
 ```xml
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
@@ -32,10 +39,14 @@
 </Ui>
 ```
 
-> [!NOTE]
-> The World of Warcraft engine TOC parser only loads `.lua` and `.xml` files; it does not process nested `.toc` manifests. As with other major WoW libraries, embedded includes should be loaded via XML or by listing the files from `libItemMove.xml` directly in your parent TOC. Ensure `LibStub` is loaded prior to `libItemMove.xml`.
+> [!NOTE] The World of Warcraft engine TOC parser only loads `.lua` and `.xml`
+> files; it does not process nested `.toc` manifests. As with other major WoW
+> libraries, embedded includes should be loaded via XML or by listing the files
+> from `libItemMove.xml` directly in your parent TOC. Ensure `LibStub` is loaded
+> prior to `libItemMove.xml`.
 
 ### Acquiring the Library Instance
+
 Inside your Lua script, request the library from `LibStub`:
 
 ```lua
@@ -47,26 +58,30 @@ if not LibItemMove then return end
 
 ## 2. Contexts Overview & Meanings
 
-Move operations require a `MoveContext` strategy object describing the transfer direction and container rules. You retrieve context strategies via `LibItemMove:GetContext(direction)`.
+Move operations require a `MoveContext` strategy object describing the transfer
+direction and container rules. You retrieve context strategies via
+`LibItemMove:GetContext(direction)`.
 
-| Direction String | Context Class | Description / Constraints |
-| :--- | :--- | :--- |
-| `"BagToBank"` / `"bag_to_bank"` | `BagToBank` | Moves items from player Bags (`0..5`) to character Bank containers (`-1`, `6..12`). Consolidates partial stacks first. |
-| `"BankToBag"` / `"bank_to_bag"` | `BankToBag` | Moves items from character Bank containers (`-1`, `6..12`) to player Bags (`0..5`). Consolidates partial stacks first. |
+| Direction String                          | Context Class    | Description / Constraints                                                                                                                                                               |
+| :---------------------------------------- | :--------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"BagToBank"` / `"bag_to_bank"`           | `BagToBank`      | Moves items from player Bags (`0..5`) to character Bank containers (`-1`, `5..11` in Classic, `6..11` in Retail). Consolidates partial stacks first.                                    |
+| `"BankToBag"` / `"bank_to_bag"`           | `BankToBag`      | Moves items from character Bank containers (`-1`, `5..11` in Classic, `6..11` in Retail) to player Bags (`0..5`). Consolidates partial stacks first.                                    |
 | `"BagToGuildBank"` / `"bag_to_guildbank"` | `BagToGuildBank` | Moves non-soulbound items from player Bags to Guild Bank (either single active tab, or multiple tabs sequentially). Checks deposit permissions and **enforces 1 move per yield cycle**. |
-| `"GuildBankToBag"` / `"guildbank_to_bag"` | `GuildBankToBag` | Moves items from current Guild Bank tab to player Bags (`0..5`). Checks withdraw permissions and **enforces 1 move per yield cycle**. |
-| `"BagToWarbank"` / `"bag_to_warbank"` | `BagToWarbank` | Moves items from player Bags to account Warbank tabs (`13..17`). Consolidates partial stacks first. |
-| `"WarbankToBag"` / `"warbank_to_bag"` | `WarbankToBag` | Moves items from account Warbank tabs (`13..17`) to player Bags (`0..5`). Consolidates partial stacks first. |
+| `"GuildBankToBag"` / `"guildbank_to_bag"` | `GuildBankToBag` | Moves items from current Guild Bank tab to player Bags (`0..5`). Checks withdraw permissions and **enforces 1 move per yield cycle**.                                                   |
+| `"BagToWarbank"` / `"bag_to_warbank"`     | `BagToWarbank`   | Moves items from player Bags to account Warbank tabs (`12..16`). Consolidates partial stacks first.                                                                                     |
+| `"WarbankToBag"` / `"warbank_to_bag"`     | `WarbankToBag`   | Moves items from account Warbank tabs (`12..16`) to player Bags (`0..5`). Consolidates partial stacks first.                                                                            |
 
 ---
 
 ## 3. Packed SlotId Specification
 
-To eliminate table allocations during scanning, slots are packed into single integer identifiers:
+To eliminate table allocations during scanning, slots are packed into single
+integer identifiers:
 
 $$\text{SlotId} = (\text{BagID} \times 1000) + \text{SlotIndex}$$
 
 ### Helper Utility Functions
+
 ```lua
 -- Encode bag 1, slot 15 -> 1015
 local slotId = LibItemMove.encode_bagslot(1, 15)
@@ -75,25 +90,27 @@ local slotId = LibItemMove.encode_bagslot(1, 15)
 local bag, slot = LibItemMove.decode_bagslot(-995)
 ```
 
-> [!NOTE]
-> WoW container IDs can be negative (e.g. `BANK_CONTAINER = -1`). `decode_bagslot` correctly restores negative bag indices.
+> [!NOTE] WoW container IDs can be negative (e.g. `BANK_CONTAINER = -1`).
+> `decode_bagslot` correctly restores negative bag indices.
 
 ---
 
 ## 4. Callback System & Error Handling
 
-`LibItemMove-1.0` uses a **hybrid callback system**. You can provide an inline callback function when calling `Move()`, and/or register for global events via `CallbackHandler-1.0`.
+`LibItemMove-1.0` uses a **hybrid callback system**. You can provide an inline
+callback function when calling `Move()`, and/or register for global events via
+`CallbackHandler-1.0`.
 
 ### Event Types & Arguments
 
-| Event Name | Signature | Description |
-| :--- | :--- | :--- |
-| `"PROGRESS"` | `(event, itemString, qtyMoved)` | Fired immediately after a single stack slot transfer is verified. |
-| `"UPDATE_UI"` | `(event)` | Fired after one or more successful moves to signal UI redraw. |
-| `"CURSOR_LOCKED_ERROR"` | `(event)` | Fired if `GetCursorInfo()` is non-nil at routine start (protects player's held cursor items). |
-| `"PERMISSION_ERROR"` | `(event)` | Fired if the player lacks deposit or withdrawal permissions (e.g., Guild Bank tab access). |
-| `"TIMEOUT_ERROR"` | `(event)` | Fired if a move transaction fails to verify within 2 seconds. Transferred cursor is cleaned via `ClearCursor()`. |
-| `"DONE"` | `(event)` | Fired when all requested transfers in the queue have completed. |
+| Event Name              | Signature                       | Description                                                                                                      |
+| :---------------------- | :------------------------------ | :--------------------------------------------------------------------------------------------------------------- |
+| `"PROGRESS"`            | `(event, itemString, qtyMoved)` | Fired immediately after a single stack slot transfer is verified.                                                |
+| `"UPDATE_UI"`           | `(event)`                       | Fired after one or more successful moves to signal UI redraw.                                                    |
+| `"CURSOR_LOCKED_ERROR"` | `(event)`                       | Fired if `GetCursorInfo()` is non-nil at routine start (protects player's held cursor items).                    |
+| `"PERMISSION_ERROR"`    | `(event)`                       | Fired if the player lacks deposit or withdrawal permissions (e.g., Guild Bank tab access).                       |
+| `"TIMEOUT_ERROR"`       | `(event)`                       | Fired if a move transaction fails to verify within 2 seconds. Transferred cursor is cleaned via `ClearCursor()`. |
+| `"DONE"`                | `(event)`                       | Fired when all requested transfers in the queue have completed.                                                  |
 
 ---
 
@@ -161,7 +178,9 @@ end)
 
 ### Example C.2: Sequential Multi-Tab Guild Bank Transfers
 
-You can deposit items into multiple specific guild bank tabs by formatting the `moveQueue` as a tab-keyed dictionary containing nested item-quantity structures:
+You can deposit items into multiple specific guild bank tabs by formatting the
+`moveQueue` as a tab-keyed dictionary containing nested item-quantity
+structures:
 
 ```lua
 -- Define specific tabs and item lists
@@ -202,7 +221,8 @@ end)
 
 ### Example E: Global Event Subscriptions via CallbackHandler-1.0
 
-If your addon consists of multiple independent UI widgets, you can register global event listeners:
+If your addon consists of multiple independent UI widgets, you can register
+global event listeners:
 
 ```lua
 local MyWidget = {}
@@ -224,17 +244,28 @@ LibItemMove:Move({ ["i:12345"] = 5 }, "BagToBank")
 
 ## 6. Debugging & Diagnostic Logs
 
-`LibItemMove-1.0` includes an optional diagnostic logging subsystem to help trace item family resolution, empty slot scanning, and compatibility checks. This is particularly useful for debugging why certain items (like trade goods or quest materials) are placed in general-purpose bags instead of specialty bags.
+`LibItemMove-1.0` includes an optional diagnostic logging subsystem to help
+trace item family resolution, empty slot scanning, and compatibility checks.
+This is particularly useful for debugging why certain items (like trade goods or
+quest materials) are placed in general-purpose bags instead of specialty bags.
 
 ### Enabling Verbosity
-You can enable log printing by setting the `Debug` property to `true` on the library instance before executing any move operations:
+
+You can enable log printing by setting the `Debug` property to `true` on the
+library instance before executing any move operations:
 
 ```lua
 local LibItemMove = LibStub("LibItemMove-1.0")
 LibItemMove.Debug = true
 ```
 
-When enabled, the library will log diagnostic messages directly to the default game chat frame (`DEFAULT_CHAT_FRAME`) or stdout. Diagnostic output includes:
-* **Bag Family Mapping**: Maps container indices to inventory slot IDs and prints the outcome of `GetInventoryItemID` or `GetInventoryItemLink` and the resolved bag family.
-* **Scan Empty Slots**: Lists which bags are checked, their capacity, resolved families, and how empty slots are prioritized.
-* **Slot Filtering**: Logs step-by-step evaluations of items checking against empty slots to trace why compatibilities fail or match.
+When enabled, the library will log diagnostic messages directly to the default
+game chat frame (`DEFAULT_CHAT_FRAME`) or stdout. Diagnostic output includes:
+
+- **Bag Family Mapping**: Maps container indices to inventory slot IDs and
+  prints the outcome of `GetInventoryItemID` or `GetInventoryItemLink` and the
+  resolved bag family.
+- **Scan Empty Slots**: Lists which bags are checked, their capacity, resolved
+  families, and how empty slots are prioritized.
+- **Slot Filtering**: Logs step-by-step evaluations of items checking against
+  empty slots to trace why compatibilities fail or match.

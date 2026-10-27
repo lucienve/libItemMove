@@ -5,8 +5,8 @@ local APIAdapter = {}
 Private.APIAdapter = APIAdapter
 
 --- Returns list of player character bag container IDs dynamically based on WoW version.
---- Classic Era (1.15.x): Bag 0 (Backpack) + Bags 1..4 = { 0, 1, 2, 3, 4 }
---- Modern Retail (11.x): Bag 0 + Bags 1..4 + Bag 5 (Reagent Bag) = { 0, 1, 2, 3, 4, 5 }
+--- Classic Era (1.15.x) & Mists of Pandaria Classic (5.5.x): Bag 0 (Backpack) + Bags 1..4 = { 0, 1, 2, 3, 4 }
+--- Modern Retail (11.x/12.x): Bag 0 + Bags 1..4 + Bag 5 (Reagent Bag) = { 0, 1, 2, 3, 4, 5 }
 --- @return number[] playerBags
 function APIAdapter.GetPlayerBagIDs()
     local numBagSlots = _G["NUM_BAG_SLOTS"] or 4
@@ -14,8 +14,9 @@ function APIAdapter.GetPlayerBagIDs()
     for i = 1, numBagSlots do
         table.insert(bags, i)
     end
-    -- Check if Reagent Bag (Bag 5) is available in Retail (where NUM_BAG_SLOTS > 4 or REAGENTBAG_CONTAINER exists)
-    if _G["REAGENTBAG_CONTAINER"] and _G["REAGENTBAG_CONTAINER"] == 5 then
+    -- Check if Reagent Bag (Bag 5) is available in Retail (where NUM_REAGENTBAG_SLOTS > 0 or REAGENTBAG_CONTAINER == 5)
+    local numReagentBagSlots = _G["NUM_REAGENTBAG_SLOTS"] or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumReagentBagSlots) or 0
+    if (_G["REAGENTBAG_CONTAINER"] and _G["REAGENTBAG_CONTAINER"] == 5) or numReagentBagSlots > 0 then
         table.insert(bags, 5)
     end
     return bags
@@ -50,14 +51,15 @@ function APIAdapter.GetBankContainerIDs()
 
     -- Reagent Bank (-3) in legacy expansions (WoD through Shadowlands)
     local isUnlockedFn = _G["IsReagentBankUnlocked"]
-    if _G["REAGENTBANK_CONTAINER"] or (type(isUnlockedFn) == "function" and isUnlockedFn()) then
-        table.insert(containers, -3)
+    if type(isUnlockedFn) == "function" and isUnlockedFn() then
+        table.insert(containers, _G["REAGENTBANK_CONTAINER"] or -3)
     end
 
     local numBagSlots = _G["NUM_BAG_SLOTS"] or 4
-    local numBankSlots = _G["NUM_BANKBAGSLOTS"] or 7
+    local numBankSlots = _G["NUM_BANKBAGSLOTS"] or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumBankBagSlots) or 7
     local startBankBag = numBagSlots + 1
-    if _G["REAGENTBAG_CONTAINER"] then
+    local numReagentBagSlots = _G["NUM_REAGENTBAG_SLOTS"] or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumReagentBagSlots) or 0
+    if (_G["REAGENTBAG_CONTAINER"] and _G["REAGENTBAG_CONTAINER"] == 5) or numReagentBagSlots > 0 then
         startBankBag = startBankBag + 1
     end
 
@@ -77,13 +79,12 @@ function APIAdapter.GetContainerItemInfo(bag, slot)
     if C_Container and C_Container.GetContainerItemInfo then
         local info = C_Container.GetContainerItemInfo(bag, slot)
         if type(info) == "table" then
-            ---@cast info table
             return {
                 stackCount = info.stackCount or 0,
                 isLocked = info.isLocked or false,
                 itemID = info.itemID,
                 isBound = info.isBound or false,
-                itemLink = info.hyperLink or info.itemLink
+                itemLink = info.hyperlink or info.hyperLink or info.itemLink
             }
         end
     end
@@ -100,7 +101,7 @@ function APIAdapter.GetContainerItemInfo(bag, slot)
                 isLocked = ret1.isLocked or false,
                 itemID = ret1.itemID,
                 isBound = ret1.isBound or false,
-                itemLink = ret1.hyperLink or ret1.itemLink
+                itemLink = ret1.hyperlink or ret1.hyperLink or ret1.itemLink
             }
         elseif ret1 or count or itemID then
             return {

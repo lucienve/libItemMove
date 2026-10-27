@@ -76,6 +76,11 @@
 ---@field Mover table Core mover engine module
 ---@field DebugLog fun(fmt: string, ...: any) Internal debug log helper
 
+--- Extended ContainerItemInfo supporting legacy fallback and wrapper field aliases
+---@class ContainerItemInfo
+---@field hyperLink? string
+---@field itemLink? string
+
 -- ---------------------------------------------------------------------------
 -- Blizzard Engine Globals & Legacy API Signatures for LuaLS
 -- ---------------------------------------------------------------------------
@@ -88,6 +93,9 @@ NUM_BAG_SLOTS = NUM_BAG_SLOTS
 
 ---@type number?
 NUM_BANKBAGSLOTS = NUM_BANKBAGSLOTS
+
+---@type number?
+NUM_REAGENTBAG_SLOTS = NUM_REAGENTBAG_SLOTS
 
 ---@type number?
 REAGENTBAG_CONTAINER = REAGENTBAG_CONTAINER
@@ -103,6 +111,9 @@ GetContainerItemInfo = GetContainerItemInfo
 
 ---@type fun(bag: number, slot: number): number?
 GetContainerItemID = GetContainerItemID
+
+---@type fun(itemInfo: string|number): string?, string?, number?, number?, number?, string?, string?, number?, string?, number?, number?, number?, number?, number?, number?, number?, boolean?
+GetItemInfo = GetItemInfo
 
 ---@type fun(bag: number, slot: number, count: number)
 SplitContainerItem = SplitContainerItem

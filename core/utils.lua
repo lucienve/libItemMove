@@ -88,10 +88,13 @@ function Utils.GetItemMaxStack(itemInput)
         if maxStack and maxStack > 0 then return maxStack end
     end
 
-    ---@diagnostic disable-next-line: deprecated
+    if C_Item and C_Item.GetItemInfo then
+        local _, _, _, _, _, _, _, maxStack = C_Item.GetItemInfo(itemID)
+        if maxStack and maxStack > 0 then return maxStack end
+    end
+
     local getItemInfo = _G["GetItemInfo"]
     if getItemInfo then
-        ---@diagnostic disable-next-line: deprecated
         local _, _, _, _, _, _, _, maxStack = getItemInfo(itemID)
         if maxStack and maxStack > 0 then return maxStack end
     end

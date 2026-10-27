@@ -320,9 +320,12 @@ function Mover.MoveMultiTabThread(moveQueue, context, callback, dispatchGlobalEv
             if _G.CreateFrame then
                 eventFrame = _G.CreateFrame("Frame")
                 eventFrame:RegisterEvent("GUILDBANKBAGSLOTS_CHANGED")
-                eventFrame:SetScript("OnEvent", function(self, event)
+                ---@param self Frame
+                ---@param event "GUILDBANKBAGSLOTS_CHANGED"
+                local function OnGuildBankBagSlotsChanged(self, event)
                     tabLoaded = true
-                end)
+                end
+                eventFrame:SetScript("OnEvent", OnGuildBankBagSlotsChanged)
             else
                 tabLoaded = true -- Fallback for environments without CreateFrame
             end

@@ -1,26 +1,73 @@
 # Project Context
 
-`LibItemMove-1.0` is an asynchronous, cooperative item movement library for World of Warcraft addons. It enables non-blocking item transfers between player character bags, character bank, Guild Bank, and account Warbanks.
+`LibItemMove-1.0` is an asynchronous, cooperative item movement library for
+World of Warcraft addons. It enables non-blocking item transfers between player
+character bags, character bank, Guild Bank, and account Warbanks.
 
 ## Current State & Architecture
-- **Cooperative Scheduler**: Drives coroutines using frame update (`OnUpdate`) ticks to execute item moves asynchronously without causing UI freezes.
-- **Packed Slot IDs**: Optimizes memory and avoids GC spikes by representing container slots as single integers: `(BagID * 1000) + SlotIndex`.
-- **API Adapter**: Standardizes compatibility between Classic (Vanilla/MoP), WoW Forever (Camelot), and Retail container APIs.
-- Context Strategies: Strategy classes that encapsulate direction-specific business rules (such as stack consolidation and specialty bag placement).
-- Embedded Include Pattern: A newly added XML manifest [libItemMove.xml](../libItemMove.xml) in the root directory that allows parent addons to include the library using a single `<Include>` tag.
+
+- **Cooperative Scheduler**: Drives coroutines using frame update (`OnUpdate`)
+  ticks to execute item moves asynchronously without causing UI freezes.
+- **Packed Slot IDs**: Optimizes memory and avoids GC spikes by representing
+  container slots as single integers: `(BagID * 1000) + SlotIndex`.
+- **API Adapter**: Standardizes compatibility between Classic (Vanilla/MoP), WoW
+  Forever (Camelot), and Retail container APIs.
+- Context Strategies: Strategy classes that encapsulate direction-specific
+  business rules (such as stack consolidation and specialty bag placement).
+- Embedded Include Pattern: A newly added XML manifest
+  [libItemMove.xml](../libItemMove.xml) in the root directory that allows parent
+  addons to include the library using a single `<Include>` tag.
 
 ## Documentation
-- [Developer API Guide](api_guide.md): Developer guide for embedding, context configuration, callbacks, and examples.
-- [Library Design](library_design.md): Deep-dive document explaining core abstractions, adapters, sorting algorithms, and rate-limiting.
+
+- [Developer API Guide](api_guide.md): Developer guide for embedding, context
+  configuration, callbacks, and examples.
+- [Library Design](library_design.md): Deep-dive document explaining core
+  abstractions, adapters, sorting algorithms, and rate-limiting.
 
 ## Completed Tasks
+
 - Added `libItemMove.xml` for support of the "Embedded Include" pattern.
-- Updated `docs/api_guide.md`, `docs/library_design.md`, and `README.md` to document the XML manifest usage and internal script loading order.
-- Fixed an issue in container family resolution where bag family checks would fail due to client-side item link caching latency by using `GetInventoryItemID` as the primary lookup method.
-- Introduced a diagnostic logging subsystem (`lib.Debug` and `Private.DebugLog`) to trace container family resolution, empty slot scanning, and item compatibility matching in real-time.
-- Modernized TOC manifest [libItemMove.toc](../libItemMove.toc) interface numbers to 11509 (Classic Era), 50504 (MoP Classic), and 120007 (Retail), removing deprecated Cataclysm interface numbers.
-- Added WoW Forever client support (interface 16001) and updated Retail interface to 120100 in [libItemMove.toc](../libItemMove.toc).
-- Normalized TOC path delimiters to forward slashes (`/`) and cleaned up standalone library references while preserving `OptionalDeps`.
-- Corrected Warbank container IDs from `13..17` to `12..16` (`Enum.BagIndex.AccountBankTab_1..5`) and added dynamic `C_Bank.FetchPurchasedBankTabIDs` resolution in [bag_to_warbank.lua](../contexts/bag_to_warbank.lua) and [warbank_to_bag.lua](../contexts/warbank_to_bag.lua).
-- Centralized `GetContainerNumSlots` into [api_adapter.lua](../core/api_adapter.lua) and modernized Retail character bank tab resolution (`6..11`).
-- Enhanced static typing in [types.lua](../core/types.lua), restricted `.luarc.json` `diagnostics.globals` to `LibStub`, configured [.luacheckrc](../.luacheckrc), and expanded unit test coverage in [mock_test.lua](../tests/mock_test.lua).
+- Updated `docs/api_guide.md`, `docs/library_design.md`, and `README.md` to
+  document the XML manifest usage and internal script loading order.
+- Fixed an issue in container family resolution where bag family checks would
+  fail due to client-side item link caching latency by using
+  `GetInventoryItemID` as the primary lookup method.
+- Introduced a diagnostic logging subsystem (`lib.Debug` and `Private.DebugLog`)
+  to trace container family resolution, empty slot scanning, and item
+  compatibility matching in real-time.
+- Modernized TOC manifest [libItemMove.toc](../libItemMove.toc) interface
+  numbers to 11509 (Classic Era), 50504 (MoP Classic), and 120007 (Retail),
+  removing deprecated Cataclysm interface numbers.
+- Added WoW Forever client support (interface 16001) and updated Retail
+  interface to 120100 in [libItemMove.toc](../libItemMove.toc).
+- Normalized TOC path delimiters to forward slashes (`/`) and cleaned up
+  standalone library references while preserving `OptionalDeps`.
+- Corrected Warbank container IDs from `13..17` to `12..16`
+  (`Enum.BagIndex.AccountBankTab_1..5`) and added dynamic
+  `C_Bank.FetchPurchasedBankTabIDs` resolution in
+  [bag_to_warbank.lua](../contexts/bag_to_warbank.lua) and
+  [warbank_to_bag.lua](../contexts/warbank_to_bag.lua).
+- Centralized `GetContainerNumSlots` into
+  [api_adapter.lua](../core/api_adapter.lua) and modernized Retail character
+  bank tab resolution (`6..11`).
+- Enhanced static typing in [types.lua](../core/types.lua), restricted
+  `.luarc.json` `diagnostics.globals` to `LibStub`, configured
+  [.luacheckrc](../.luacheckrc), and expanded unit test coverage in
+  [mock_test.lua](../tests/mock_test.lua).
+- Fixed `ContainerItemInfo.hyperlink` lowercase field normalization in
+  [api_adapter.lua](../core/api_adapter.lua), ensuring item link variants and
+  bonus IDs are preserved and compared in `Utils.IsItemMatching`.
+- Fixed the Reagent Bank (`-3`) guard in
+  [api_adapter.lua](../core/api_adapter.lua) to require
+  `IsReagentBankUnlocked()`, preventing truthy `REAGENTBANK_CONTAINER` from
+  falsely injecting container `-3` in Mists of Pandaria Classic (`50504`).
+- Gated player Reagent Bag (`5`) inclusion on `NUM_REAGENTBAG_SLOTS` and
+  `REAGENTBAG_CONTAINER == 5`, preserving `0..4` player bags and `5..11` bank
+  bags in Mists of Pandaria Classic and Classic Era.
+- Removed prohibited blind inline suppressions
+  (`---@diagnostic disable-next-line`) from [utils.lua](../core/utils.lua),
+  queried `C_Item.GetItemInfo` before falling back to `GetItemInfo`, and typed
+  `GUILDBANKBAGSLOTS_CHANGED` in [mover.lua](../mover.lua).
+- Formatted repository Markdown files with Prettier and resolved all
+  markdownlint diagnostics.
