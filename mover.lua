@@ -125,6 +125,7 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                         remainingToMove = remainingToMove - moveQty
                         workingQty = workingQty - moveQty
                         pData.roomLeft = pData.roomLeft - moveQty
+                        pData.currentQty = pData.currentQty + moveQty
                     end
                 end
 
