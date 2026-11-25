@@ -41,14 +41,25 @@ function BagToGuildBank:GetBagFamily(bag)
     return 0
 end
 
---- Splits item from player bag slot and picks up on target Guild Bank tab slot.
+--- Moves item from player bag slot to target Guild Bank tab slot, splitting partial stacks and picking up full stacks.
 --- @param fromSlotId SlotId Packed source slot ID
 --- @param toSlotId SlotId Packed target slot ID
 --- @param quantity number Quantity to move
 function BagToGuildBank:MoveSlot(fromSlotId, toSlotId, quantity)
+    if not quantity or quantity <= 0 then
+        return
+    end
+    local currentQty = self:GetSourceSlotQuantity(fromSlotId)
+    if currentQty <= 0 then
+        return
+    end
     local sBag, sSlot = Utils.decode_bagslot(fromSlotId)
     local tTab, tSlot = Utils.decode_bagslot(toSlotId)
-    APIAdapter.SplitContainerItem(sBag, sSlot, quantity)
+    if currentQty > 1 and quantity < currentQty then
+        APIAdapter.SplitContainerItem(sBag, sSlot, quantity)
+    else
+        APIAdapter.PickupContainerItem(sBag, sSlot)
+    end
     APIAdapter.PickupGuildBankItem(tTab, tSlot)
 end
 

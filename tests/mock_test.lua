@@ -189,6 +189,14 @@ _G.PickupGuildBankItem = function(tab, slot)
         cursorState = nil
         cursorItemId = nil
         cursorSrcInfo = nil
+    elseif cursorState == nil then
+        local info = mockGuildBank[tab] and mockGuildBank[tab][slot]
+        if info and info.stackCount and info.stackCount > 0 then
+            cursorState = "item"
+            cursorItemId = info.itemID
+            cursorSrcInfo = info
+            info.heldSplit = info.stackCount
+        end
     end
 end
 
@@ -255,6 +263,14 @@ _G.C_Container = {
             cursorState = nil
             cursorItemId = nil
             cursorSrcInfo = nil
+        elseif cursorState == nil then
+            local info = mockContainers[bag] and mockContainers[bag][slot]
+            if info and info.stackCount and info.stackCount > 0 then
+                cursorState = "item"
+                cursorItemId = info.itemID
+                cursorSrcInfo = info
+                info.heldSplit = info.stackCount
+            end
         end
     end,
     ContainerIDToInventoryID = function(bag) return nil end
@@ -1801,6 +1817,285 @@ do
     mockContainers = t19OrigMockContainers
     mockGuildBank = t19OrigMockGuildBank
     print("[PASS] Negative item-link IDs and uncached item max stack fallback tests passed.")
+end
+
+-- Test 20: MoveSlot Uses Pickup for Full Stacks and Unstackable Items (Issue #7)
+do
+    local t20OrigCBank = _G.C_Bank
+    local t20OrigCGuildBank = _G.C_GuildBank
+    local t20OrigEnum = _G.Enum
+    local t20OrigGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+    local t20OrigSplitContainerItem = _G.C_Container.SplitContainerItem
+    local t20OrigPickupContainerItem = _G.C_Container.PickupContainerItem
+    local t20OrigSplitGuildBankItem = _G.SplitGuildBankItem
+    local t20OrigPickupGuildBankItem = _G.PickupGuildBankItem
+    local t20OrigGetItemMaxStackSizeByID = _G.C_Item.GetItemMaxStackSizeByID
+    local t20OrigActiveGuildBankTab = activeGuildBankTab
+    local t20OrigMockContainers = mockContainers
+    local t20OrigMockGuildBank = mockGuildBank
+
+    _G.Enum = {
+        BankType = { Character = 0, Guild = 1, Account = 2 },
+        BagIndex = {
+            Backpack = 0,
+            CharacterBankTab_1 = 6,
+            AccountBankTab_1 = 12,
+        },
+    }
+    _G.C_Bank = {
+        CanUseBank = function() return true end,
+        FetchPurchasedBankTabIDs = function(bankType)
+            if bankType == 0 then return { 6 } end
+            if bankType == 2 then return { 12 } end
+            return {}
+        end,
+        IsItemAllowedInBankType = function() return true end,
+    }
+    _G.C_GuildBank = {
+        IsGuildBankEnabled = function() return true end,
+    }
+    _G.C_Container.GetContainerNumSlots = function(bag)
+        if bag == 0 or bag == 6 or bag == 12 then return 4 end
+        return 0
+    end
+    _G.C_Item.GetItemMaxStackSizeByID = function() return 20 end
+    activeGuildBankTab = 2
+
+    local t20Calls = {
+        splitContainer = 0,
+        pickupContainer = 0,
+        splitGuild = 0,
+        pickupGuild = 0,
+    }
+    local function resetCalls()
+        t20Calls.splitContainer = 0
+        t20Calls.pickupContainer = 0
+        t20Calls.splitGuild = 0
+        t20Calls.pickupGuild = 0
+    end
+
+    local function installCountingWrappers(strictSplit)
+        _G.C_Container.SplitContainerItem = function(bag, slot, count)
+            t20Calls.splitContainer = t20Calls.splitContainer + 1
+            if strictSplit then
+                local info = mockContainers[bag] and mockContainers[bag][slot]
+                if not info or not info.stackCount or info.stackCount <= 1 or count >= info.stackCount then
+                    return
+                end
+            end
+            t20OrigSplitContainerItem(bag, slot, count)
+        end
+        _G.C_Container.PickupContainerItem = function(bag, slot)
+            t20Calls.pickupContainer = t20Calls.pickupContainer + 1
+            t20OrigPickupContainerItem(bag, slot)
+        end
+        _G.SplitGuildBankItem = function(tab, slot, count)
+            t20Calls.splitGuild = t20Calls.splitGuild + 1
+            if strictSplit then
+                local info = mockGuildBank[tab] and mockGuildBank[tab][slot]
+                if not info or not info.stackCount or info.stackCount <= 1 or count >= info.stackCount then
+                    return
+                end
+            end
+            t20OrigSplitGuildBankItem(tab, slot, count)
+        end
+        _G.PickupGuildBankItem = function(tab, slot)
+            t20Calls.pickupGuild = t20Calls.pickupGuild + 1
+            t20OrigPickupGuildBankItem(tab, slot)
+        end
+    end
+
+    installCountingWrappers(false)
+
+    local t20Cases = {
+        { name = "BagToBank", ctx = Private.BagToBank, sKind = "bag", sBag = 0, tKind = "bag", tBag = 6 },
+        { name = "BankToBag", ctx = Private.BankToBag, sKind = "bag", sBag = 6, tKind = "bag", tBag = 0 },
+        { name = "BagToWarbank", ctx = Private.BagToWarbank, sKind = "bag", sBag = 0, tKind = "bag", tBag = 12 },
+        { name = "WarbankToBag", ctx = Private.WarbankToBag, sKind = "bag", sBag = 12, tKind = "bag", tBag = 0 },
+        { name = "BagToGuildBank", ctx = Private.BagToGuildBank, sKind = "bag", sBag = 0, tKind = "guild", tBag = 2 },
+        { name = "GuildBankToBag", ctx = Private.GuildBankToBag, sKind = "guild", sBag = 2, tKind = "bag", tBag = 0 },
+    }
+
+    local function resetContainersForCase(c, srcQty, itemId)
+        mockContainers = { [0] = {}, [6] = {}, [12] = {} }
+        mockGuildBank = { [2] = {} }
+        local entry = { itemID = itemId, stackCount = srcQty, isLocked = false, isBound = false, hyperlink = "item:" .. itemId, itemLink = "item:" .. itemId }
+        if c.sKind == "guild" then
+            mockGuildBank[c.sBag][1] = entry
+        else
+            mockContainers[c.sBag][1] = entry
+        end
+    end
+
+    local function getSlotQty(kind, bag, slot)
+        local store = (kind == "guild") and mockGuildBank or mockContainers
+        local info = store[bag] and store[bag][slot]
+        return info and info.stackCount or 0
+    end
+
+    -- 20a: Verify Split* vs Pickup* dispatch across all 6 contexts
+    for _, c in ipairs(t20Cases) do
+        local fromId = lib.encode_bagslot(c.sBag, 1)
+        local toId = lib.encode_bagslot(c.tBag, 1)
+
+        -- Unstackable / single item (stackCount == 1, qty == 1)
+        resetContainersForCase(c, 1, 7701)
+        resetCalls()
+        c.ctx:MoveSlot(fromId, toId, 1)
+        assert(t20Calls.splitContainer == 0 and t20Calls.splitGuild == 0,
+            "Test 20a (" .. c.name .. "): single item must not call Split*")
+        assert(getSlotQty(c.sKind, c.sBag, 1) == 0 and getSlotQty(c.tKind, c.tBag, 1) == 1,
+            "Test 20a (" .. c.name .. "): single item must move via Pickup*")
+
+        -- Full stack (stackCount == 20, qty == 20)
+        resetContainersForCase(c, 20, 7702)
+        resetCalls()
+        c.ctx:MoveSlot(fromId, toId, 20)
+        assert(t20Calls.splitContainer == 0 and t20Calls.splitGuild == 0,
+            "Test 20a (" .. c.name .. "): full stack must not call Split*")
+        assert(getSlotQty(c.sKind, c.sBag, 1) == 0 and getSlotQty(c.tKind, c.tBag, 1) == 20,
+            "Test 20a (" .. c.name .. "): full stack must move via Pickup*")
+
+        -- Over-requested quantity (stackCount == 10, qty == 25)
+        resetContainersForCase(c, 10, 7703)
+        resetCalls()
+        c.ctx:MoveSlot(fromId, toId, 25)
+        assert(t20Calls.splitContainer == 0 and t20Calls.splitGuild == 0,
+            "Test 20a (" .. c.name .. "): qty > currentQty must not call Split*")
+        assert(getSlotQty(c.sKind, c.sBag, 1) == 0 and getSlotQty(c.tKind, c.tBag, 1) == 10,
+            "Test 20a (" .. c.name .. "): qty > currentQty must move full stack via Pickup*")
+
+        -- Non-integer quantity on single item (stackCount == 1, qty == 0.5)
+        resetContainersForCase(c, 1, 7704)
+        resetCalls()
+        c.ctx:MoveSlot(fromId, toId, 0.5)
+        assert(t20Calls.splitContainer == 0 and t20Calls.splitGuild == 0,
+            "Test 20a (" .. c.name .. "): stackCount == 1 with fractional qty must not call Split*")
+        assert(getSlotQty(c.sKind, c.sBag, 1) == 0 and getSlotQty(c.tKind, c.tBag, 1) == 1,
+            "Test 20a (" .. c.name .. "): stackCount == 1 with fractional qty must move via Pickup*")
+
+        -- Partial stack (stackCount == 20, qty == 7)
+        resetContainersForCase(c, 20, 7705)
+        resetCalls()
+        c.ctx:MoveSlot(fromId, toId, 7)
+        if c.sKind == "guild" then
+            assert(t20Calls.splitGuild == 1 and t20Calls.pickupGuild == 0 and t20Calls.pickupContainer == 1,
+                "Test 20a (" .. c.name .. "): partial stack must call SplitGuildBankItem then PickupContainerItem")
+        elseif c.tKind == "guild" then
+            assert(t20Calls.splitContainer == 1 and t20Calls.pickupContainer == 0 and t20Calls.pickupGuild == 1,
+                "Test 20a (" .. c.name .. "): partial stack must call SplitContainerItem then PickupGuildBankItem")
+        else
+            assert(t20Calls.splitContainer == 1 and t20Calls.pickupContainer == 1,
+                "Test 20a (" .. c.name .. "): partial stack must call SplitContainerItem then target PickupContainerItem")
+        end
+        assert(getSlotQty(c.sKind, c.sBag, 1) == 13 and getSlotQty(c.tKind, c.tBag, 1) == 7,
+            "Test 20a (" .. c.name .. "): partial stack counts mismatch")
+
+        -- 20c: Empty source slot & invalid quantity guards
+        resetContainersForCase(c, 0, 7706)
+        local occupiedEntry = { itemID = 7706, stackCount = 5, isLocked = false, isBound = false, hyperlink = "item:7706", itemLink = "item:7706" }
+        if c.tKind == "guild" then
+            mockGuildBank[c.tBag][1] = occupiedEntry
+        else
+            mockContainers[c.tBag][1] = occupiedEntry
+        end
+        resetCalls()
+        c.ctx:MoveSlot(fromId, toId, 1)
+        assert(t20Calls.splitContainer == 0 and t20Calls.pickupContainer == 0 and t20Calls.splitGuild == 0 and t20Calls.pickupGuild == 0,
+            "Test 20c (" .. c.name .. "): empty source must be a no-op")
+        assert(_G.GetCursorInfo() == nil and getSlotQty(c.tKind, c.tBag, 1) == 5,
+            "Test 20c (" .. c.name .. "): empty source must leave cursor empty and target untouched")
+
+        resetContainersForCase(c, 5, 7706)
+        for _, badQty in ipairs({ 0, -3 }) do
+            resetCalls()
+            c.ctx:MoveSlot(fromId, toId, badQty)
+            assert(t20Calls.splitContainer == 0 and t20Calls.pickupContainer == 0 and t20Calls.splitGuild == 0 and t20Calls.pickupGuild == 0,
+                "Test 20c (" .. c.name .. "): non-positive qty must be a no-op")
+        end
+        resetCalls()
+        c.ctx:MoveSlot(fromId, toId, nil)
+        assert(t20Calls.splitContainer == 0 and t20Calls.pickupContainer == 0 and t20Calls.splitGuild == 0 and t20Calls.pickupGuild == 0,
+            "Test 20c (" .. c.name .. "): nil qty must be a no-op")
+    end
+
+    -- 20b: Multi-move partial + remainder consolidation (Move 1 splits, Move 2 picks up)
+    mockContainers = {
+        [0] = {
+            [1] = { itemID = 12345, stackCount = 20, isLocked = false, isBound = false, hyperlink = "item:12345" },
+        },
+        [6] = {
+            [1] = { itemID = 12345, stackCount = 14, isLocked = false, isBound = false, hyperlink = "item:12345" },
+        },
+        [12] = {},
+    }
+    mockGuildBank = { [2] = {} }
+    resetCalls()
+    local t20bDone = false
+    local t20bTimeout = false
+    lib:Move({ ["i:12345"] = 20 }, "BagToBank", function(event)
+        if event == "TIMEOUT_ERROR" then t20bTimeout = true end
+        if event == "DONE" then t20bDone = true end
+    end)
+    local t20Ticks = 0
+    while frameShown and t20Ticks < 40 do
+        t20Ticks = t20Ticks + 1
+        if frameScript then frameScript(nil, 0.05) end
+    end
+    assert(t20bDone == true and t20bTimeout == false, "Test 20b: Multi-move consolidation must complete without timeout")
+    assert(t20Calls.splitContainer == 1 and t20Calls.pickupContainer == 3,
+        "Test 20b: Move 1 must split (1) and Move 2 must pickup remainder (3 total container pickups)")
+    assert(mockContainers[0][1].stackCount == 0 and mockContainers[6][1].stackCount == 20 and mockContainers[6][2].stackCount == 14,
+        "Test 20b: Partial + remainder quantities failed")
+
+    -- 20d: Strict split-rejecting client simulation (end-to-end lib:Move without TIMEOUT_ERROR)
+    installCountingWrappers(true)
+    local t20StrictMoves = {
+        { dir = "BagToBank", sKind = "bag", sBag = 0, tKind = "bag", tBag = 6, qty = 1, itemId = 7801 },
+        { dir = "BagToBank", sKind = "bag", sBag = 0, tKind = "bag", tBag = 6, qty = 20, itemId = 7802 },
+        { dir = "BankToBag", sKind = "bag", sBag = 6, tKind = "bag", tBag = 0, qty = 1, itemId = 7803 },
+        { dir = "BankToBag", sKind = "bag", sBag = 6, tKind = "bag", tBag = 0, qty = 20, itemId = 7804 },
+        { dir = "BagToGuildBank", sKind = "bag", sBag = 0, tKind = "guild", tBag = 2, qty = 1, itemId = 7805 },
+        { dir = "BagToGuildBank", sKind = "bag", sBag = 0, tKind = "guild", tBag = 2, qty = 20, itemId = 7806 },
+        { dir = "GuildBankToBag", sKind = "guild", sBag = 2, tKind = "bag", tBag = 0, qty = 1, itemId = 7807 },
+        { dir = "GuildBankToBag", sKind = "guild", sBag = 2, tKind = "bag", tBag = 0, qty = 20, itemId = 7808 },
+    }
+    for _, m in ipairs(t20StrictMoves) do
+        resetContainersForCase(m, m.qty, m.itemId)
+        resetCalls()
+        local done = false
+        local timedOut = false
+        lib:Move({ ["i:" .. m.itemId] = m.qty }, m.dir, function(event)
+            if event == "TIMEOUT_ERROR" then timedOut = true end
+            if event == "DONE" then done = true end
+        end)
+        t20Ticks = 0
+        while frameShown and t20Ticks < 40 do
+            t20Ticks = t20Ticks + 1
+            if frameScript then frameScript(nil, 0.05) end
+        end
+        assert(done == true and timedOut == false,
+            "Test 20d (" .. m.dir .. ", qty=" .. m.qty .. "): strict split-rejecting client must complete without TIMEOUT_ERROR")
+        assert(t20Calls.splitContainer == 0 and t20Calls.splitGuild == 0,
+            "Test 20d (" .. m.dir .. ", qty=" .. m.qty .. "): must not invoke Split*")
+        assert(getSlotQty(m.sKind, m.sBag, 1) == 0 and getSlotQty(m.tKind, m.tBag, 1) == m.qty,
+            "Test 20d (" .. m.dir .. ", qty=" .. m.qty .. "): item failed to transfer cleanly")
+    end
+
+    -- Restore Test 20 globals
+    _G.C_Bank = t20OrigCBank
+    _G.C_GuildBank = t20OrigCGuildBank
+    _G.Enum = t20OrigEnum
+    _G.C_Container.GetContainerNumSlots = t20OrigGetContainerNumSlots
+    _G.C_Container.SplitContainerItem = t20OrigSplitContainerItem
+    _G.C_Container.PickupContainerItem = t20OrigPickupContainerItem
+    _G.SplitGuildBankItem = t20OrigSplitGuildBankItem
+    _G.PickupGuildBankItem = t20OrigPickupGuildBankItem
+    _G.C_Item.GetItemMaxStackSizeByID = t20OrigGetItemMaxStackSizeByID
+    activeGuildBankTab = t20OrigActiveGuildBankTab
+    mockContainers = t20OrigMockContainers
+    mockGuildBank = t20OrigMockGuildBank
+    print("[PASS] MoveSlot Pickup vs Split dispatch and strict client simulation tests passed.")
 end
 
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")

@@ -37,14 +37,25 @@ function GuildBankToBag:HasPermission()
     return true
 end
 
---- Splits item from Guild Bank tab slot and picks up on target bag slot.
+--- Moves item from Guild Bank tab slot to target bag slot, splitting partial stacks and picking up full stacks.
 --- @param fromSlotId SlotId Packed source slot ID
 --- @param toSlotId SlotId Packed target slot ID
 --- @param quantity number Quantity to move
 function GuildBankToBag:MoveSlot(fromSlotId, toSlotId, quantity)
+    if not quantity or quantity <= 0 then
+        return
+    end
+    local currentQty = self:GetSourceSlotQuantity(fromSlotId)
+    if currentQty <= 0 then
+        return
+    end
     local sTab, sSlot = Utils.decode_bagslot(fromSlotId)
     local tBag, tSlot = Utils.decode_bagslot(toSlotId)
-    APIAdapter.SplitGuildBankItem(sTab, sSlot, quantity)
+    if currentQty > 1 and quantity < currentQty then
+        APIAdapter.SplitGuildBankItem(sTab, sSlot, quantity)
+    else
+        APIAdapter.PickupGuildBankItem(sTab, sSlot)
+    end
     APIAdapter.PickupContainerItem(tBag, tSlot)
 end
 

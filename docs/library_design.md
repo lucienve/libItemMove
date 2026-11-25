@@ -55,7 +55,7 @@ flowchart TD
     D -- Yes --> E[Pair Source Slot & Target Slot]
     D -- No --> F[Skip Slot / Try Next Empty Slot]
     E --> G{Are there moves in Queue?}
-    G -- Yes --> H[Execute Single Move: Split & Pickup]
+    G -- Yes --> H[Execute Single Move: Split or Pickup & Drop]
     H --> I[Yield to Next Frame]
     I --> J{Has Source Quantity Decreased?}
     J -- Yes --> K[Remove from Queue / Trigger Callback]
@@ -93,10 +93,12 @@ Reagent bags):
 
 All moves must run inside a coroutine scheduler:
 
-1. **Unify Split Commands**: Always use
+1. **Split vs. Pickup Commands**: Use
    `C_Container.SplitContainerItem(fromBag, fromSlot, quantity)` (or
-   `SplitGuildBankItem` for guild bank) to place items on the cursor, even if
-   moving a full stack.
+   `SplitGuildBankItem` for Guild Bank) only when splitting a partial stack
+   (`currentQty > 1 and quantity < currentQty`). For full stacks or single /
+   unstackable items, call `C_Container.PickupContainerItem` (or
+   `PickupGuildBankItem`) to pick up the slot directly onto the cursor.
 2. **Cursor Placement**: If `GetCursorInfo() == "item"`, call
    `C_Container.PickupContainerItem(toBag, toSlot)` (or `PickupGuildBankItem`)
    to drop the items.
