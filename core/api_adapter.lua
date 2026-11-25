@@ -22,28 +22,59 @@ function APIAdapter.GetPlayerBagIDs()
     return bags
 end
 
---- Returns list of character bank container IDs dynamically based on WoW version.
---- Classic Era: -1 (BANK_CONTAINER) + Bank Bags 5..11
---- Modern Retail (11.0+): CharacterBankTab_1..6 (6..11) or dynamically queried via C_Bank
---- @return number[] bankContainers
-function APIAdapter.GetBankContainerIDs()
-    -- Modern Retail with Account / Character Bank tabs (11.0+)
+--- Collects contiguous numeric enum values from Enum.BagIndex for a given prefix
+--- (e.g., "CharacterBankTab_" or "AccountBankTab_"), starting at index 1.
+--- @param prefix string Enum.BagIndex member prefix
+--- @return number[] tabIDs
+local function CollectEnumBankTabIDs(prefix)
+    local tabs = {}
+    local bagIndex = Enum and Enum.BagIndex --[[@as table<string, number?>]]
+    if type(bagIndex) ~= "table" then
+        return tabs
+    end
+    local i = 1
+    while true do
+        local bagID = bagIndex[prefix .. i]
+        if type(bagID) ~= "number" then
+            break
+        end
+        table.insert(tabs, bagID)
+        i = i + 1
+    end
+    return tabs
+end
+
+--- Queries C_Bank.FetchPurchasedBankTabIDs for a bankType when available.
+--- Returns a table (including {} for 0 tabs) if the API exists, or nil if C_Bank is unavailable.
+--- @param bankType number Enum.BankType value
+--- @return number[]? tabIDs
+local function FetchPurchasedBankTabs(bankType)
     if C_Bank and C_Bank.FetchPurchasedBankTabIDs then
-        local bankTypeCharacter = (Enum and Enum.BankType and Enum.BankType.Character) or 0
-        local tabs = C_Bank.FetchPurchasedBankTabIDs(bankTypeCharacter)
-        if tabs and #tabs > 0 then
+        local tabs = C_Bank.FetchPurchasedBankTabIDs(bankType)
+        if type(tabs) == "table" then
             return tabs
         end
+        return {}
+    end
+    return nil
+end
+
+--- Returns list of character bank container IDs dynamically based on WoW version.
+--- Classic Era / Mists Classic: -1 (BANK_CONTAINER), optional -3 (Reagent Bank), and Bank Bags 5..11
+--- Modern Retail (11.0+): CharacterBankTab_1..6 (6..11) via C_Bank or Enum.BagIndex
+--- WoW Forever (16001): CharacterBankTab_1..9 (6..14) via C_Bank or Enum.BagIndex
+--- @return number[] bankContainers
+function APIAdapter.GetBankContainerIDs()
+    -- Modern Retail (11.0+) and WoW Forever (16001): trust C_Bank directly (including {} when 0 tabs are purchased)
+    local bankTypeCharacter = (Enum and Enum.BankType and Enum.BankType.Character) or 0
+    local purchasedTabs = FetchPurchasedBankTabs(bankTypeCharacter)
+    if purchasedTabs then
+        return purchasedTabs
     end
 
-    if Enum and Enum.BagIndex and Enum.BagIndex.CharacterBankTab_1 then
-        local tabs = {}
-        local firstTab = Enum.BagIndex.CharacterBankTab_1
-        local lastTab = Enum.BagIndex.CharacterBankTab_6 or (firstTab + 5)
-        for i = firstTab, lastTab do
-            table.insert(tabs, i)
-        end
-        return tabs
+    local enumTabs = CollectEnumBankTabIDs("CharacterBankTab_")
+    if #enumTabs > 0 then
+        return enumTabs
     end
 
     -- Classic / Legacy Bank layout
@@ -68,6 +99,25 @@ function APIAdapter.GetBankContainerIDs()
     end
 
     return containers
+end
+
+--- Returns list of account (Warbank) container IDs dynamically based on WoW version.
+--- Modern Retail (11.0+): AccountBankTab_1..5 (12..16) via C_Bank or Enum.BagIndex
+--- WoW Forever (16001): AccountBankTab_1..9 (15..23) via C_Bank or Enum.BagIndex
+--- @return number[] warbankContainers
+function APIAdapter.GetWarbankContainerIDs()
+    local bankTypeAccount = (Enum and Enum.BankType and Enum.BankType.Account) or 2
+    local purchasedTabs = FetchPurchasedBankTabs(bankTypeAccount)
+    if purchasedTabs then
+        return purchasedTabs
+    end
+
+    local enumTabs = CollectEnumBankTabIDs("AccountBankTab_")
+    if #enumTabs > 0 then
+        return enumTabs
+    end
+
+    return {}
 end
 
 --- Returns normalized container item information table or nil if slot is empty.

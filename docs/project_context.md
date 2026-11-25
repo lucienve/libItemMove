@@ -80,3 +80,11 @@ character bags, character bank, Guild Bank, and account Warbanks.
   in [mover.lua](../mover.lua) (`Mover.MoveThread`) to prevent premature
   transaction verification, and added multi-source partial-stack regression
   tests in [mock_test.lua](../tests/mock_test.lua).
+- Fixed dynamic Character Bank and Warbank container ID resolution for WoW
+  Forever (`16001` 9-tab Camelot layout) in
+  [api_adapter.lua](../core/api_adapter.lua),
+  [bag_to_warbank.lua](../contexts/bag_to_warbank.lua), and
+  [warbank_to_bag.lua](../contexts/warbank_to_bag.lua), trusting
+  `C_Bank.FetchPurchasedBankTabIDs` directly on empty returns and discovering
+  contiguous `Enum.BagIndex` tab entries dynamically, with regression tests in
+  [mock_test.lua](../tests/mock_test.lua) (Issue #2).

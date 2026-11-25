@@ -550,13 +550,82 @@ assert(Private.APIAdapter.GetContainerNumSlots(-1) == 4, "Test 13: Bank slots fa
 assert(Private.APIAdapter.GetContainerNumSlots(99) == 0, "Test 13: Nonexistent container should return 0")
 print("[PASS] APIAdapter.GetContainerNumSlots Resolution test passed.")
 
--- Test 14: Warbank & Modern Character Bank Container Resolution
+-- Test 14: Warbank & Modern Character Bank Container Resolution (Retail, WoW Forever, Classic)
 local b2w = Private.BagToWarbank
 local w2b = Private.WarbankToBag
-assert(b2w.WARBANK_CONTAINERS[1] == 12 and b2w.WARBANK_CONTAINERS[5] == 16, "Test 14: BagToWarbank default containers should be 12..16")
-assert(w2b.WARBANK_CONTAINERS[1] == 12 and w2b.WARBANK_CONTAINERS[5] == 16, "Test 14: WarbankToBag default containers should be 12..16")
+local origCBank = _G.C_Bank
+local origEnum = _G.Enum
+local origGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
 
--- Test dynamic C_Bank querying
+-- 14a: Absent C_Bank and absent Enum.BagIndex returns empty Warbank containers
+_G.C_Bank = nil
+_G.Enum = nil
+local emptyWarbankB2W = b2w:GetWarbankContainers()
+local emptyWarbankW2B = w2b:GetWarbankContainers()
+assert(#emptyWarbankB2W == 0, "Test 14a: BagToWarbank should return {} when C_Bank and Enum are absent")
+assert(#emptyWarbankW2B == 0, "Test 14a: WarbankToBag should return {} when C_Bank and Enum are absent")
+
+-- 14b: Retail Enum.BagIndex fallback (CharacterBankTab_1..6 = 6..11, AccountBankTab_1..5 = 12..16)
+_G.Enum = {
+    BagIndex = {
+        CharacterBankTab_1 = 6,
+        CharacterBankTab_2 = 7,
+        CharacterBankTab_3 = 8,
+        CharacterBankTab_4 = 9,
+        CharacterBankTab_5 = 10,
+        CharacterBankTab_6 = 11,
+        AccountBankTab_1 = 12,
+        AccountBankTab_2 = 13,
+        AccountBankTab_3 = 14,
+        AccountBankTab_4 = 15,
+        AccountBankTab_5 = 16,
+    }
+}
+local retailBankEnum = Private.APIAdapter.GetBankContainerIDs()
+assert(#retailBankEnum == 6 and retailBankEnum[1] == 6 and retailBankEnum[6] == 11,
+    "Test 14b: Retail Enum.BagIndex fallback should resolve CharacterBankTab 6..11")
+local retailWarbankB2W = b2w:GetWarbankContainers()
+local retailWarbankW2B = w2b:GetWarbankContainers()
+assert(#retailWarbankB2W == 5 and retailWarbankB2W[1] == 12 and retailWarbankB2W[5] == 16,
+    "Test 14b: Retail BagToWarbank fallback should resolve AccountBankTab 12..16")
+assert(#retailWarbankW2B == 5 and retailWarbankW2B[1] == 12 and retailWarbankW2B[5] == 16,
+    "Test 14b: Retail WarbankToBag fallback should resolve AccountBankTab 12..16")
+
+-- 14c: WoW Forever Enum.BagIndex fallback (CharacterBankTab_1..9 = 6..14, AccountBankTab_1..9 = 15..23)
+_G.Enum = {
+    BagIndex = {
+        Keyring = -1,
+        CharacterBankTab_1 = 6,
+        CharacterBankTab_2 = 7,
+        CharacterBankTab_3 = 8,
+        CharacterBankTab_4 = 9,
+        CharacterBankTab_5 = 10,
+        CharacterBankTab_6 = 11,
+        CharacterBankTab_7 = 12,
+        CharacterBankTab_8 = 13,
+        CharacterBankTab_9 = 14,
+        AccountBankTab_1 = 15,
+        AccountBankTab_2 = 16,
+        AccountBankTab_3 = 17,
+        AccountBankTab_4 = 18,
+        AccountBankTab_5 = 19,
+        AccountBankTab_6 = 20,
+        AccountBankTab_7 = 21,
+        AccountBankTab_8 = 22,
+        AccountBankTab_9 = 23,
+    }
+}
+local foreverBankEnum = Private.APIAdapter.GetBankContainerIDs()
+assert(#foreverBankEnum == 9 and foreverBankEnum[1] == 6 and foreverBankEnum[9] == 14,
+    "Test 14c: Forever Enum.BagIndex fallback should resolve CharacterBankTab 6..14")
+local foreverWarbankB2W = b2w:GetWarbankContainers()
+local foreverWarbankW2B = w2b:GetWarbankContainers()
+assert(#foreverWarbankB2W == 9 and foreverWarbankB2W[1] == 15 and foreverWarbankB2W[9] == 23,
+    "Test 14c: Forever BagToWarbank fallback should resolve AccountBankTab 15..23")
+assert(#foreverWarbankW2B == 9 and foreverWarbankW2B[1] == 15 and foreverWarbankW2B[9] == 23,
+    "Test 14c: Forever WarbankToBag fallback should resolve AccountBankTab 15..23")
+
+-- 14d: Dynamic C_Bank querying on Retail
 _G.C_Bank = {
     FetchPurchasedBankTabIDs = function(bankType)
         if bankType == 2 then -- Enum.BankType.Account
@@ -572,13 +641,91 @@ _G.C_Bank = {
 }
 
 local activeWarbankTabs = b2w:GetWarbankContainers()
-assert(#activeWarbankTabs == 2 and activeWarbankTabs[1] == 12 and activeWarbankTabs[2] == 13, "Test 14: Dynamic Warbank tab query failed")
-assert(b2w:HasPermission() == true, "Test 14: Warbank permission check failed")
+assert(#activeWarbankTabs == 2 and activeWarbankTabs[1] == 12 and activeWarbankTabs[2] == 13,
+    "Test 14d: Dynamic Warbank tab query failed")
+assert(b2w:HasPermission() == true, "Test 14d: Warbank permission check failed")
 
 local modernBankTabs = Private.APIAdapter.GetBankContainerIDs()
-assert(#modernBankTabs == 3 and modernBankTabs[1] == 6 and modernBankTabs[3] == 8, "Test 14: Dynamic modern bank tabs query failed")
+assert(#modernBankTabs == 3 and modernBankTabs[1] == 6 and modernBankTabs[3] == 8,
+    "Test 14d: Dynamic modern bank tabs query failed")
 
+-- 14e: Dynamic C_Bank querying on WoW Forever (9-tab Camelot layout + ShouldUsePlayerBagsInBank)
+_G.Enum.BankType = { Character = 0, Guild = 1, Account = 2 }
+_G.C_Bank = {
+    ShouldUsePlayerBagsInBank = function()
+        return true
+    end,
+    FetchPurchasedBankTabIDs = function(bankType)
+        if bankType == 0 then
+            return { 6, 7, 8, 9, 10, 11, 12, 13, 14 }
+        elseif bankType == 2 then
+            return { 15, 16, 17, 18, 19, 20, 21, 22, 23 }
+        end
+        return {}
+    end,
+    CanUseBank = function(bankType)
+        return bankType == 0 or bankType == 2
+    end
+}
+local foreverBankDynamic = Private.APIAdapter.GetBankContainerIDs()
+assert(#foreverBankDynamic == 9 and foreverBankDynamic[1] == 6 and foreverBankDynamic[9] == 14,
+    "Test 14e: Forever dynamic bank tabs should return 6..14")
+local foreverWarbankDynB2W = b2w:GetWarbankContainers()
+local foreverWarbankDynW2B = w2b:GetWarbankContainers()
+assert(#foreverWarbankDynB2W == 9 and foreverWarbankDynB2W[1] == 15 and foreverWarbankDynB2W[9] == 23,
+    "Test 14e: Forever dynamic BagToWarbank tabs should return 15..23")
+assert(#foreverWarbankDynW2B == 9 and foreverWarbankDynW2B[1] == 15 and foreverWarbankDynW2B[9] == 23,
+    "Test 14e: Forever dynamic WarbankToBag tabs should return 15..23")
+
+-- Verify unequipped Camelot bank bag slot (0 slots) is skipped while tab 9 (14) is scanned
+_G.C_Container.GetContainerNumSlots = function(bag)
+    if bag == 14 then return 2 end
+    return 0
+end
+local foreverEmptySlots = {}
+Private.BagToBank:GetEmptySlots(foreverEmptySlots)
+assert(#foreverEmptySlots == 2 and foreverEmptySlots[1] == 14001 and foreverEmptySlots[2] == 14002,
+    "Test 14e: BagToBank:GetEmptySlots should skip unequipped 0-slot tabs and scan tab 14")
+_G.C_Container.GetContainerNumSlots = origGetContainerNumSlots
+
+-- 14f: Zero-purchased-tabs must return {} without falling back to Enum.BagIndex or colliding on 12..14
+_G.C_Bank = {
+    FetchPurchasedBankTabIDs = function()
+        return {}
+    end
+}
+local zeroBankTabs = Private.APIAdapter.GetBankContainerIDs()
+local zeroWarbankB2W = b2w:GetWarbankContainers()
+local zeroWarbankW2B = w2b:GetWarbankContainers()
+assert(#zeroBankTabs == 0, "Test 14f: 0 purchased character bank tabs must return {}")
+assert(#zeroWarbankB2W == 0, "Test 14f: 0 purchased warbank tabs (BagToWarbank) must return {}")
+assert(#zeroWarbankW2B == 0, "Test 14f: 0 purchased warbank tabs (WarbankToBag) must return {}")
+
+-- 14g: Classic Enum.BagIndex regression (no CharacterBankTab_* -> falls through to legacy -1, 5..11)
 _G.C_Bank = nil
+_G.Enum = {
+    BagIndex = {
+        Bank = -1,
+        BankBag_1 = 6,
+        BankBag_2 = 7,
+        BankBag_3 = 8,
+        BankBag_4 = 9,
+        BankBag_5 = 10,
+        BankBag_6 = 11,
+        BankBag_7 = 12,
+        AccountBankTab_1 = 13,
+        AccountBankTab_2 = 14,
+        AccountBankTab_3 = 15,
+        AccountBankTab_4 = 16,
+        AccountBankTab_5 = 17,
+    }
+}
+local classicBankFallback = Private.APIAdapter.GetBankContainerIDs()
+assert(#classicBankFallback == 8 and classicBankFallback[1] == -1 and classicBankFallback[2] == 5 and classicBankFallback[8] == 11,
+    "Test 14g: Classic Enum.BagIndex should fall through to legacy bank layout -1 and 5..11")
+
+_G.C_Bank = origCBank
+_G.Enum = origEnum
 print("[PASS] Warbank & Modern Character Bank Container Resolution test passed.")
 
 -- Test 15a: Sequential Partial-Stack Accumulation (BagToGuildBank delayed confirmation)
