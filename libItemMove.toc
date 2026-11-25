@@ -5,7 +5,6 @@
 ## Version: 1.0.0
 ## OptionalDeps: LibStub, CallbackHandler-1.0
 
-core/types.lua
 core/utils.lua
 core/api_adapter.lua
 core/scheduler.lua

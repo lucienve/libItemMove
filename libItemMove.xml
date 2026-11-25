@@ -1,6 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
     <!-- Core Libraries -->
-    <Script file="core/types.lua"/>
     <Script file="core/utils.lua"/>
     <Script file="core/api_adapter.lua"/>
     <Script file="core/scheduler.lua"/>

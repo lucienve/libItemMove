@@ -71,3 +71,8 @@ character bags, character bank, Guild Bank, and account Warbanks.
   `GUILDBANKBAGSLOTS_CHANGED` in [mover.lua](../mover.lua).
 - Formatted repository Markdown files with Prettier and resolved all
   markdownlint diagnostics.
+- Removed static-analysis-only [types.lua](../core/types.lua) from
+  [libItemMove.toc](../libItemMove.toc) and
+  [libItemMove.xml](../libItemMove.xml) so it is not executed at runtime and
+  does not taint Blizzard globals, and updated
+  [library_design.md](library_design.md) Section 5 accordingly.
