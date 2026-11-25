@@ -88,3 +88,13 @@ character bags, character bank, Guild Bank, and account Warbanks.
   `C_Bank.FetchPurchasedBankTabIDs` directly on empty returns and discovering
   contiguous `Enum.BagIndex` tab entries dynamically, with regression tests in
   [mock_test.lua](../tests/mock_test.lua) (Issue #2).
+- Failed closed in [bag_to_warbank.lua](../contexts/bag_to_warbank.lua) and
+  [warbank_to_bag.lua](../contexts/warbank_to_bag.lua) when `C_Bank` is
+  unavailable, guarded `AccountBankTab_*` fallback in
+  [api_adapter.lua](../core/api_adapter.lua), preferred
+  `ITEM_INVENTORY_BANK_BAG_OFFSET` for legacy bank bag resolution (`5..11` on
+  MoP Classic), and added `C_GuildBank.IsGuildBankEnabled()` checks in
+  [bag_to_guildbank.lua](../contexts/bag_to_guildbank.lua),
+  [guildbank_to_bag.lua](../contexts/guildbank_to_bag.lua), and
+  [mover.lua](../mover.lua) with regression tests in
+  [mock_test.lua](../tests/mock_test.lua) (Issue #5).

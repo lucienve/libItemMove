@@ -29,9 +29,9 @@ end
 function BagToWarbank:HasPermission()
     if C_Bank and C_Bank.CanUseBank then
         local bankTypeAccount = (Enum and Enum.BankType and Enum.BankType.Account) or 2
-        return C_Bank.CanUseBank(bankTypeAccount)
+        return not not C_Bank.CanUseBank(bankTypeAccount)
     end
-    return true
+    return false
 end
 
 --- Splits item from player bag slot and picks up on target Warbank slot.

@@ -303,6 +303,11 @@ function Mover.MoveMultiTabThread(moveQueue, context, callback, dispatchGlobalEv
         return
     end
 
+    if context.isGuildBank and C_GuildBank and C_GuildBank.IsGuildBankEnabled and not C_GuildBank.IsGuildBankEnabled() then
+        NotifyCallback(callback, dispatchGlobalEvent, "PERMISSION_ERROR")
+        return
+    end
+
     -- Collect and sort tab indices
     local tabs = {}
     for tabIndex, _ in pairs(moveQueue) do

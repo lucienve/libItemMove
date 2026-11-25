@@ -21,6 +21,9 @@ end
 --- Checks if the player has withdrawal permissions on the current Guild Bank tab.
 --- @return boolean hasPermission
 function GuildBankToBag:HasPermission()
+    if C_GuildBank and C_GuildBank.IsGuildBankEnabled and not C_GuildBank.IsGuildBankEnabled() then
+        return false
+    end
     local currentTab = (_G.GetCurrentGuildBankTab and _G.GetCurrentGuildBankTab()) or 1
     if _G.GetGuildBankTabInfo then
         local _, _, isViewable, _, numWithdrawals, remainingWithdrawals = _G.GetGuildBankTabInfo(currentTab)

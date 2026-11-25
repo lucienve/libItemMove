@@ -15,8 +15,10 @@ function APIAdapter.GetPlayerBagIDs()
         table.insert(bags, i)
     end
     -- Check if Reagent Bag (Bag 5) is available in Retail (where NUM_REAGENTBAG_SLOTS > 0 or REAGENTBAG_CONTAINER == 5)
+    local bankBagOffset = _G["ITEM_INVENTORY_BANK_BAG_OFFSET"]
+    local hasLegacyBankAt5 = type(bankBagOffset) == "number" and bankBagOffset > 0 and bankBagOffset < 5
     local numReagentBagSlots = _G["NUM_REAGENTBAG_SLOTS"] or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumReagentBagSlots) or 0
-    if (_G["REAGENTBAG_CONTAINER"] and _G["REAGENTBAG_CONTAINER"] == 5) or numReagentBagSlots > 0 then
+    if numReagentBagSlots > 0 or (_G["REAGENTBAG_CONTAINER"] == 5 and not hasLegacyBankAt5) then
         table.insert(bags, 5)
     end
     return bags
@@ -88,10 +90,16 @@ function APIAdapter.GetBankContainerIDs()
 
     local numBagSlots = _G["NUM_BAG_SLOTS"] or 4
     local numBankSlots = _G["NUM_BANKBAGSLOTS"] or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumBankBagSlots) or 7
-    local startBankBag = numBagSlots + 1
-    local numReagentBagSlots = _G["NUM_REAGENTBAG_SLOTS"] or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumReagentBagSlots) or 0
-    if (_G["REAGENTBAG_CONTAINER"] and _G["REAGENTBAG_CONTAINER"] == 5) or numReagentBagSlots > 0 then
-        startBankBag = startBankBag + 1
+    local bankBagOffset = _G["ITEM_INVENTORY_BANK_BAG_OFFSET"]
+    local startBankBag
+    if type(bankBagOffset) == "number" and bankBagOffset > 0 then
+        startBankBag = bankBagOffset + 1
+    else
+        startBankBag = numBagSlots + 1
+        local numReagentBagSlots = _G["NUM_REAGENTBAG_SLOTS"] or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumReagentBagSlots) or 0
+        if (_G["REAGENTBAG_CONTAINER"] and _G["REAGENTBAG_CONTAINER"] == 5) or numReagentBagSlots > 0 then
+            startBankBag = startBankBag + 1
+        end
     end
 
     for i = startBankBag, startBankBag + numBankSlots - 1 do
@@ -102,6 +110,7 @@ function APIAdapter.GetBankContainerIDs()
 end
 
 --- Returns list of account (Warbank) container IDs dynamically based on WoW version.
+--- Classic Era / Mists Classic: {} (Warbank unsupported)
 --- Modern Retail (11.0+): AccountBankTab_1..5 (12..16) via C_Bank or Enum.BagIndex
 --- WoW Forever (16001): AccountBankTab_1..9 (15..23) via C_Bank or Enum.BagIndex
 --- @return number[] warbankContainers
@@ -112,9 +121,14 @@ function APIAdapter.GetWarbankContainerIDs()
         return purchasedTabs
     end
 
-    local enumTabs = CollectEnumBankTabIDs("AccountBankTab_")
-    if #enumTabs > 0 then
-        return enumTabs
+    -- Classic Era / Mists Classic define AccountBankTab_1..5 alongside legacy BankBag_1..7
+    -- without CharacterBankTab_*; only use Enum.BagIndex fallback on modern bank layouts.
+    local bagIndex = Enum and Enum.BagIndex --[[@as table<string, number?>]]
+    if type(bagIndex) == "table" and type(bagIndex["CharacterBankTab_1"]) == "number" then
+        local enumTabs = CollectEnumBankTabIDs("AccountBankTab_")
+        if #enumTabs > 0 then
+            return enumTabs
+        end
     end
 
     return {}
