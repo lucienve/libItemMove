@@ -1295,4 +1295,348 @@ _G.ItemLocation = orig17ItemLocation
 mockContainers = orig17MockContainers
 print("[PASS] Virtual bank tab family, IsItemAllowedInBankType, and Character Bank CanUseBank tests passed.")
 
+-- Test 18: Reagent Bag (Bag 5) Family Resolution & Crafting Reagent Compatibility (Issue #6)
+do
+    local t18OrigCItemGetItemInfo = _G.C_Item.GetItemInfo
+    local t18OrigCItemGetItemFamily = _G.C_Item.GetItemFamily
+    local t18OrigGetItemInfo = _G.GetItemInfo
+    local t18OrigNumReagentBagSlots = _G.NUM_REAGENTBAG_SLOTS
+    local t18OrigReagentBagContainer = _G.REAGENTBAG_CONTAINER
+    local t18OrigBankBagOffset = _G.ITEM_INVENTORY_BANK_BAG_OFFSET
+    local t18OrigConstants = _G.Constants
+    local t18OrigGetContainerNumFreeSlots = _G.C_Container.GetContainerNumFreeSlots
+    local t18OrigGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+    local t18OrigPickupContainerItem = _G.C_Container.PickupContainerItem
+    local t18OrigContainerIDToInventoryID = _G.C_Container.ContainerIDToInventoryID
+    local t18OrigGetInventoryItemID = _G.GetInventoryItemID
+    local t18OrigAdapterGetItemFamily = Private.APIAdapter.GetItemFamily
+    local t18OrigCBank = _G.C_Bank
+    local t18OrigCGuildBank = _G.C_GuildBank
+    local t18OrigEnum = _G.Enum
+    local t18OrigActiveGuildBankTab = activeGuildBankTab
+    local t18OrigMockContainers = mockContainers
+    local t18OrigMockGuildBank = mockGuildBank
+
+    local function makeItemInfoReturn(isReagent)
+        return "Item", "item:1", 1, 1, 1, "Trade Goods", "Other", 200, "", 1, 0, 7, 0, 0, 0, nil, isReagent, ""
+    end
+
+    -- 18a: APIAdapter.IsCraftingReagent (nil guard, C_Item.GetItemInfo, no double-call fallback, legacy fallback)
+    local t18LegacyCalls = 0
+    _G.GetItemInfo = function(item)
+        t18LegacyCalls = t18LegacyCalls + 1
+        if item == 9001 then
+            return makeItemInfoReturn(true)
+        end
+        return nil
+    end
+    _G.C_Item.GetItemInfo = function(item)
+        if item == 9001 then
+            return makeItemInfoReturn(true)
+        elseif item == 9002 then
+            return makeItemInfoReturn(false)
+        end
+        return nil
+    end
+
+    assert(Private.APIAdapter.IsCraftingReagent(nil) == false, "Test 18a: IsCraftingReagent(nil) must return false")
+    assert(Private.APIAdapter.IsCraftingReagent(9001) == true, "Test 18a: IsCraftingReagent must return true for reagent")
+    assert(Private.APIAdapter.IsCraftingReagent(9002) == false, "Test 18a: IsCraftingReagent must return false for non-reagent")
+    assert(Private.APIAdapter.IsCraftingReagent(9003) == false, "Test 18a: IsCraftingReagent must fail closed (false) for uncached item")
+    assert(t18LegacyCalls == 0, "Test 18a: Legacy GetItemInfo must not be called when C_Item.GetItemInfo exists")
+
+    _G.C_Item.GetItemInfo = nil
+    assert(Private.APIAdapter.IsCraftingReagent(9001) == true, "Test 18a: Legacy GetItemInfo fallback must return true for reagent")
+    assert(Private.APIAdapter.IsCraftingReagent(9002) == false, "Test 18a: Legacy GetItemInfo fallback must return false for uncached item")
+    assert(t18LegacyCalls == 2, "Test 18a: Legacy GetItemInfo fallback should be called once per item when C_Item.GetItemInfo is nil")
+
+    -- 18b: APIAdapter.GetBagItemFamily(5) on Retail/Forever vs Classic/MoP
+    _G.NUM_REAGENTBAG_SLOTS = 1
+    _G.ITEM_INVENTORY_BANK_BAG_OFFSET = nil
+    _G.REAGENTBAG_CONTAINER = nil
+    _G.Enum = {
+        BagIndex = {
+            Backpack = 0,
+            ReagentBag = 5,
+            CharacterBankTab_1 = 6,
+            AccountBankTab_1 = 12,
+        },
+        BankType = { Character = 0, Guild = 1, Account = 2 },
+    }
+
+    _G.C_Container.GetContainerNumFreeSlots = function(bag)
+        if bag == 5 then return 10, 2048 end
+        return 10, 0
+    end
+    assert(Private.APIAdapter.GetBagItemFamily(5) == 2048, "Test 18b: Retail Bag 5 with family 2048 must return 2048")
+
+    _G.C_Container.GetContainerNumFreeSlots = function(bag)
+        if bag == 5 then return 10, 0 end
+        return 10, 0
+    end
+    assert(Private.APIAdapter.GetBagItemFamily(5) == 2048, "Test 18b: Retail Bag 5 reporting 0 must default to 2048")
+
+    _G.C_Container.GetContainerNumFreeSlots = function()
+        return 0, nil
+    end
+    assert(Private.APIAdapter.GetBagItemFamily(5) == 2048, "Test 18b: Retail Bag 5 returning nil family must default to 2048")
+
+    _G.C_Container.GetContainerNumFreeSlots = nil
+    assert(Private.APIAdapter.GetBagItemFamily(5) == 2048, "Test 18b: Retail Bag 5 without GetContainerNumFreeSlots must default to 2048")
+
+    -- MoP Classic / Classic Era: Bag 5 is Bank Bag 1 even when Enum.BagIndex.ReagentBag = 5 and REAGENTBAG_CONTAINER = 5
+    _G.NUM_REAGENTBAG_SLOTS = nil
+    _G.Constants = nil
+    _G.ITEM_INVENTORY_BANK_BAG_OFFSET = 4
+    _G.REAGENTBAG_CONTAINER = 5
+    _G.C_Container.GetContainerNumFreeSlots = function(bag)
+        if bag == 5 then return 10, 0 end
+        return 10, 0
+    end
+    assert(Private.APIAdapter.GetBagItemFamily(5) == 0, "Test 18b: MoP Classic Bank Bag 5 reporting 0 must remain 0")
+
+    _G.C_Container.GetContainerNumFreeSlots = nil
+    _G.C_Container.ContainerIDToInventoryID = function(bag)
+        if bag == 5 then return 68 end
+        return nil
+    end
+    _G.GetInventoryItemID = function(unit, slot)
+        if unit == "player" and slot == 68 then return 44446 end
+        return nil
+    end
+    Private.APIAdapter.GetItemFamily = function(itemInput)
+        if itemInput == 44446 then return 1024 end
+        return 0
+    end
+    assert(Private.APIAdapter.GetBagItemFamily(5) == 1024, "Test 18b: Classic/MoP Bank Bag 5 must preserve legacy ContainerIDToInventoryID resolution")
+    Private.APIAdapter.GetItemFamily = t18OrigAdapterGetItemFamily
+
+    -- 18c: Utils.IsFamilyCompatible with REAGENT_BAG_FAMILY (2048)
+    assert(Private.Utils.REAGENT_BAG_FAMILY == 2048, "Test 18c: Utils.REAGENT_BAG_FAMILY must equal 2048")
+    assert(Private.Utils.IsFamilyCompatible(0, 2048, true) == true, "Test 18c: Reagent with itemFamily 0 must fit Bag 5")
+    assert(Private.Utils.IsFamilyCompatible(32, 2048, true) == true, "Test 18c: Herb reagent (itemFamily 32) must fit Bag 5")
+    assert(Private.Utils.IsFamilyCompatible(1024, 2048, true) == true, "Test 18c: Mining reagent (itemFamily 1024) must fit Bag 5")
+    assert(Private.Utils.IsFamilyCompatible(2048, 2048, true) == true, "Test 18c: Reagent with itemFamily 2048 must fit Bag 5")
+    assert(Private.Utils.IsFamilyCompatible(0, 2048, false) == false, "Test 18c: Non-reagent must be rejected by Bag 5")
+    assert(Private.Utils.IsFamilyCompatible(2048, 2048, false) == false, "Test 18c: Non-reagent must be rejected by Bag 5 even if itemFamily is 2048")
+    assert(Private.Utils.IsFamilyCompatible(32, 2048, nil) == false, "Test 18c: Uncached/nil isCraftingReagent must fail closed on Bag 5")
+    assert(Private.Utils.IsFamilyCompatible(0, 0, false) == true, "Test 18c: Non-reagent must fit general bag 0")
+    assert(Private.Utils.IsFamilyCompatible(32, 0, true) == true, "Test 18c: Reagent must also fit general bag 0")
+    assert(Private.Utils.IsFamilyCompatible(32, 32, true) == true, "Test 18c: Legacy herb bag (32) must still accept herbs")
+    assert(Private.Utils.IsFamilyCompatible(1024, 32, true) == false, "Test 18c: Legacy herb bag (32) must still reject ore")
+
+    -- 18d: End-to-end Mover.FindTargetSlot, BankToBag, WarbankToBag, GuildBankToBag, and BagToGuildBank Tab 5
+    _G.NUM_REAGENTBAG_SLOTS = 1
+    _G.ITEM_INVENTORY_BANK_BAG_OFFSET = nil
+    _G.REAGENTBAG_CONTAINER = nil
+    local t18Bag5FamilyReturn = 2048
+    _G.C_Container.GetContainerNumFreeSlots = function(bag)
+        if bag == 5 then return 2, t18Bag5FamilyReturn end
+        return 2, 0
+    end
+    _G.C_Container.GetContainerNumSlots = function(bag)
+        if bag == 0 or bag == 5 or bag == 6 or bag == 12 then return 2 end
+        return 0
+    end
+    _G.C_Bank = {
+        CanUseBank = function() return true end,
+        FetchPurchasedBankTabIDs = function(bankType)
+            if bankType == 0 then return { 6 } end
+            if bankType == 2 then return { 12 } end
+            return {}
+        end,
+        IsItemAllowedInBankType = function() return true end,
+    }
+    _G.C_GuildBank = {
+        IsGuildBankEnabled = function() return true end,
+    }
+
+    -- Item catalog for Test 18d:
+    -- 9101: Crafting reagent, itemFamily = 0
+    -- 9102: Herb crafting reagent, itemFamily = 32
+    -- 9103: Non-reagent gear/potion, itemFamily = 0, isCraftingReagent = false
+    -- 9104: Uncached item (GetItemInfo returns nil), itemFamily = 0
+    _G.C_Item.GetItemInfo = function(item)
+        if item == 9101 or item == 9102 then
+            return makeItemInfoReturn(true)
+        elseif item == 9103 then
+            return makeItemInfoReturn(false)
+        end
+        return nil
+    end
+    _G.C_Item.GetItemFamily = function(item)
+        if item == 9102 then return 32 end
+        return 0
+    end
+
+    -- Simulate real client behavior: Bag 5 rejects non-reagent drops (item stays on cursor)
+    _G.C_Container.PickupContainerItem = function(bag, slot)
+        if cursorState == "item" and bag == 5 and cursorItemId ~= 9101 and cursorItemId ~= 9102 then
+            return
+        end
+        t18OrigPickupContainerItem(bag, slot)
+    end
+
+    -- Case 1: BankToBag withdraws reagent (itemFamily 0) and herb reagent (itemFamily 32) into Bag 5 empty slots
+    mockContainers = {
+        [0] = {},
+        [5] = {},
+        [6] = {
+            [1] = { itemID = 9101, stackCount = 5, isLocked = false, isBound = false, hyperlink = "item:9101" },
+            [2] = { itemID = 9102, stackCount = 3, isLocked = false, isBound = false, hyperlink = "item:9102" },
+        },
+        [12] = {},
+    }
+    local t18ReagentBankDone = false
+    local t18ReagentBankTimeout = false
+    lib:Move({ ["i:9101"] = 5, ["i:9102"] = 3 }, "BankToBag", function(event)
+        if event == "TIMEOUT_ERROR" then t18ReagentBankTimeout = true end
+        if event == "DONE" then t18ReagentBankDone = true end
+    end)
+    ticks = 0
+    while frameShown and ticks < 30 do
+        ticks = ticks + 1
+        if frameScript then frameScript(nil, 0.05) end
+    end
+    assert(t18ReagentBankDone == true and t18ReagentBankTimeout == false, "Test 18d: BankToBag reagents must complete without timeout")
+    local t18Bag5ItemIDs = {}
+    for _, slotIdx in ipairs({ 1, 2 }) do
+        local slotEntry = mockContainers[5][slotIdx]
+        assert(slotEntry ~= nil, "Test 18d: Expected Bag 5 slot " .. slotIdx .. " to be populated")
+        t18Bag5ItemIDs[slotEntry.itemID] = slotEntry.stackCount
+    end
+    assert(t18Bag5ItemIDs[9101] == 5, "Test 18d: Reagent with itemFamily 0 must prioritize Bag 5")
+    assert(t18Bag5ItemIDs[9102] == 3, "Test 18d: Herb reagent with itemFamily 32 must prioritize Bag 5")
+    assert(mockContainers[0][1] == nil, "Test 18d: General bag 0 must remain empty when Bag 5 holds reagents")
+
+    -- Case 2: ScanPartialSlots / WarbankToBag consolidates reagent (itemFamily 32) into existing partial stack in Bag 5
+    mockContainers[5][1] = { itemID = 9102, stackCount = 4, isLocked = false, isBound = false, hyperlink = "item:9102" }
+    mockContainers[5][2] = nil
+    mockContainers[12] = {
+        [1] = { itemID = 9102, stackCount = 6, isLocked = false, isBound = false, hyperlink = "item:9102" },
+    }
+    local t18PartialDone = false
+    local t18PartialTimeout = false
+    lib:Move({ ["i:9102"] = 6 }, "WarbankToBag", function(event)
+        if event == "TIMEOUT_ERROR" then t18PartialTimeout = true end
+        if event == "DONE" then t18PartialDone = true end
+    end)
+    ticks = 0
+    while frameShown and ticks < 30 do
+        ticks = ticks + 1
+        if frameScript then frameScript(nil, 0.05) end
+    end
+    assert(t18PartialDone == true and t18PartialTimeout == false, "Test 18d: WarbankToBag partial consolidation into Bag 5 must succeed")
+    assert(mockContainers[5][1].stackCount == 10, "Test 18d: Bag 5 partial stack must consolidate to 10")
+
+    -- Case 3: Uncached Bag 5 (GetContainerNumFreeSlots returns 0 or nil) must NEVER accept non-reagents or uncached items
+    for _, bag5Ret in ipairs({ 0, nil }) do
+        if bag5Ret == nil then
+            t18Bag5FamilyReturn = nil
+        else
+            t18Bag5FamilyReturn = bag5Ret
+        end
+        mockContainers[0] = {}
+        mockContainers[5] = {}
+        mockContainers[6] = {
+            [1] = { itemID = 9103, stackCount = 1, isLocked = false, isBound = false, hyperlink = "item:9103" },
+        }
+        mockContainers[12] = {
+            [1] = { itemID = 9104, stackCount = 2, isLocked = false, isBound = false, hyperlink = "item:9104" },
+        }
+
+        local t18NonReagentDone = false
+        local t18NonReagentTimeout = false
+        lib:Move({ ["i:9103"] = 1 }, "BankToBag", function(event)
+            if event == "TIMEOUT_ERROR" then t18NonReagentTimeout = true end
+            if event == "DONE" then t18NonReagentDone = true end
+        end)
+        ticks = 0
+        while frameShown and ticks < 40 do
+            ticks = ticks + 1
+            if frameScript then frameScript(nil, 0.05) end
+        end
+        assert(t18NonReagentDone == true and t18NonReagentTimeout == false,
+            "Test 18d: BankToBag non-reagent must route to Bag 0 without TIMEOUT_ERROR when Bag 5 reports " .. tostring(bag5Ret))
+        assert(mockContainers[5][1] == nil, "Test 18d: Non-reagent must not be placed in Bag 5")
+        assert(mockContainers[0][1] and mockContainers[0][1].itemID == 9103, "Test 18d: Non-reagent must land in Bag 0")
+
+        local t18UncachedDone = false
+        local t18UncachedTimeout = false
+        lib:Move({ ["i:9104"] = 2 }, "WarbankToBag", function(event)
+            if event == "TIMEOUT_ERROR" then t18UncachedTimeout = true end
+            if event == "DONE" then t18UncachedDone = true end
+        end)
+        ticks = 0
+        while frameShown and ticks < 40 do
+            ticks = ticks + 1
+            if frameScript then frameScript(nil, 0.05) end
+        end
+        assert(t18UncachedDone == true and t18UncachedTimeout == false,
+            "Test 18d: Uncached item must skip Bag 5 and land in Bag 0 without TIMEOUT_ERROR")
+        assert(mockContainers[5][1] == nil, "Test 18d: Uncached item must not be placed in Bag 5")
+        assert(mockContainers[0][2] and mockContainers[0][2].itemID == 9104, "Test 18d: Uncached item must land in Bag 0 slot 2")
+    end
+
+    -- Case 4: GuildBankToBag routes non-reagent to Bag 0 (not Bag 5), and BagToGuildBank Tab 5 still accepts non-reagents
+    t18Bag5FamilyReturn = 0
+    mockContainers[0] = {}
+    mockContainers[5] = {}
+    mockGuildBank[5] = {
+        [1] = { itemID = 9103, stackCount = 1, itemLink = "item:9103" },
+    }
+    activeGuildBankTab = 5
+    local t18GbToBagDone = false
+    local t18GbToBagTimeout = false
+    lib:Move({ ["i:9103"] = 1 }, "GuildBankToBag", function(event)
+        if event == "TIMEOUT_ERROR" then t18GbToBagTimeout = true end
+        if event == "DONE" then t18GbToBagDone = true end
+    end)
+    ticks = 0
+    while frameShown and ticks < 40 do
+        ticks = ticks + 1
+        if frameScript then frameScript(nil, 0.05) end
+    end
+    assert(t18GbToBagDone == true and t18GbToBagTimeout == false, "Test 18d: GuildBankToBag non-reagent must succeed without TIMEOUT_ERROR")
+    assert(mockContainers[5][1] == nil and mockContainers[0][1] and mockContainers[0][1].itemID == 9103,
+        "Test 18d: GuildBankToBag non-reagent must skip Bag 5 and land in Bag 0")
+
+    local t18BagToGbDone = false
+    local t18BagToGbTimeout = false
+    lib:Move({ ["i:9103"] = 1 }, "BagToGuildBank", function(event)
+        if event == "TIMEOUT_ERROR" then t18BagToGbTimeout = true end
+        if event == "DONE" then t18BagToGbDone = true end
+    end)
+    ticks = 0
+    while frameShown and ticks < 40 do
+        ticks = ticks + 1
+        if frameScript then frameScript(nil, 0.05) end
+    end
+    assert(t18BagToGbDone == true and t18BagToGbTimeout == false, "Test 18d: BagToGuildBank Tab 5 must still accept non-reagents")
+    assert(mockGuildBank[5][1] and mockGuildBank[5][1].itemID == 9103 and mockGuildBank[5][1].stackCount == 1,
+        "Test 18d: Guild Bank Tab 5 slot 1 must receive non-reagent")
+
+    -- Restore Test 18 globals
+    _G.C_Item.GetItemInfo = t18OrigCItemGetItemInfo
+    _G.C_Item.GetItemFamily = t18OrigCItemGetItemFamily
+    _G.GetItemInfo = t18OrigGetItemInfo
+    _G.NUM_REAGENTBAG_SLOTS = t18OrigNumReagentBagSlots
+    _G.REAGENTBAG_CONTAINER = t18OrigReagentBagContainer
+    _G.ITEM_INVENTORY_BANK_BAG_OFFSET = t18OrigBankBagOffset
+    _G.Constants = t18OrigConstants
+    _G.C_Container.GetContainerNumFreeSlots = t18OrigGetContainerNumFreeSlots
+    _G.C_Container.GetContainerNumSlots = t18OrigGetContainerNumSlots
+    _G.C_Container.PickupContainerItem = t18OrigPickupContainerItem
+    _G.C_Container.ContainerIDToInventoryID = t18OrigContainerIDToInventoryID
+    _G.GetInventoryItemID = t18OrigGetInventoryItemID
+    Private.APIAdapter.GetItemFamily = t18OrigAdapterGetItemFamily
+    _G.C_Bank = t18OrigCBank
+    _G.C_GuildBank = t18OrigCGuildBank
+    _G.Enum = t18OrigEnum
+    activeGuildBankTab = t18OrigActiveGuildBankTab
+    mockContainers = t18OrigMockContainers
+    mockGuildBank = t18OrigMockGuildBank
+    print("[PASS] Reagent Bag (Bag 5) family resolution and crafting reagent compatibility tests passed.")
+end
+
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")

@@ -30,15 +30,17 @@ end
 function Mover.FindTargetSlot(itemString, emptySlots, context)
     local itemID = Utils.GetItemIdFromString(itemString)
     local itemFamily = APIAdapter.GetItemFamily(itemID)
+    local isCraftingReagent = APIAdapter.IsCraftingReagent(itemID)
 
     if Private.DebugLog then
-        Private.DebugLog("FindTargetSlot(%s): itemID = %s, itemFamily = %s", tostring(itemString), tostring(itemID), tostring(itemFamily))
+        Private.DebugLog("FindTargetSlot(%s): itemID = %s, itemFamily = %s, isCraftingReagent = %s",
+            tostring(itemString), tostring(itemID), tostring(itemFamily), tostring(isCraftingReagent))
     end
 
     for idx, slotId in ipairs(emptySlots) do
         local tBag, tSlot = Utils.decode_bagslot(slotId)
         local bagFamily = context:GetBagFamily(tBag)
-        local compatible = Utils.IsFamilyCompatible(itemFamily, bagFamily)
+        local compatible = Utils.IsFamilyCompatible(itemFamily, bagFamily, isCraftingReagent)
 
         if Private.DebugLog then
             Private.DebugLog("FindTargetSlot(%s): checking empty slot %d (bag %d, slot %d) with bagFamily = %s. Compatible = %s",
