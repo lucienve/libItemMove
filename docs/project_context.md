@@ -76,3 +76,7 @@ character bags, character bank, Guild Bank, and account Warbanks.
   [libItemMove.xml](../libItemMove.xml) so it is not executed at runtime and
   does not taint Blizzard globals, and updated
   [library_design.md](library_design.md) Section 5 accordingly.
+- Fixed `pData.currentQty` accumulation during sequential partial-stack merges
+  in [mover.lua](../mover.lua) (`Mover.MoveThread`) to prevent premature
+  transaction verification, and added multi-source partial-stack regression
+  tests in [mock_test.lua](../tests/mock_test.lua).

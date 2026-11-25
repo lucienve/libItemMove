@@ -39,13 +39,18 @@ end
 
 local cursorState = nil
 local cursorItemId = nil
+local cursorSrcInfo = nil
 _G.GetCursorInfo = function()
     return cursorState, cursorItemId
 end
 
 _G.ClearCursor = function()
+    if cursorSrcInfo then
+        cursorSrcInfo.heldSplit = nil
+    end
     cursorState = nil
     cursorItemId = nil
+    cursorSrcInfo = nil
 end
 
 local frameScript = nil
@@ -153,17 +158,18 @@ _G.GetGuildBankItemLink = function(tab, slot)
 end
 
 _G.SplitGuildBankItem = function(tab, slot, count)
-    if mockGuildBank[tab] and mockGuildBank[tab][slot] then
-        local info = mockGuildBank[tab][slot]
+    local info = mockGuildBank[tab] and mockGuildBank[tab][slot]
+    if info and info.stackCount and info.stackCount > 0 then
         cursorState = "item"
         cursorItemId = info.itemID
+        cursorSrcInfo = info
         info.heldSplit = count
     end
 end
 
 _G.PickupGuildBankItem = function(tab, slot)
     if cursorState == "item" then
-        local srcInfo = mockContainers[0][1]
+        local srcInfo = cursorSrcInfo or mockContainers[0][1]
         local movedQty = srcInfo.heldSplit or 10
         srcInfo.stackCount = srcInfo.stackCount - movedQty
         srcInfo.heldSplit = nil
@@ -182,6 +188,7 @@ _G.PickupGuildBankItem = function(tab, slot)
 
         cursorState = nil
         cursorItemId = nil
+        cursorSrcInfo = nil
     end
 end
 
@@ -216,16 +223,17 @@ _G.C_Container = {
         return info and info.itemID
     end,
     SplitContainerItem = function(bag, slot, count)
-        local info = mockContainers[bag][slot]
-        if info then
+        local info = mockContainers[bag] and mockContainers[bag][slot]
+        if info and info.stackCount and info.stackCount > 0 then
             cursorState = "item"
             cursorItemId = info.itemID
+            cursorSrcInfo = info
             info.heldSplit = count
         end
     end,
     PickupContainerItem = function(bag, slot)
         if cursorState == "item" then
-            local srcInfo = mockContainers[0][1]
+            local srcInfo = cursorSrcInfo or mockContainers[0][1]
             local movedQty = srcInfo.heldSplit or 15
             srcInfo.stackCount = srcInfo.stackCount - movedQty
             srcInfo.heldSplit = nil
@@ -246,6 +254,7 @@ _G.C_Container = {
 
             cursorState = nil
             cursorItemId = nil
+            cursorSrcInfo = nil
         end
     end,
     ContainerIDToInventoryID = function(bag) return nil end
@@ -571,5 +580,137 @@ assert(#modernBankTabs == 3 and modernBankTabs[1] == 6 and modernBankTabs[3] == 
 
 _G.C_Bank = nil
 print("[PASS] Warbank & Modern Character Bank Container Resolution test passed.")
+
+-- Test 15a: Sequential Partial-Stack Accumulation (BagToGuildBank delayed confirmation)
+mockContainers[0] = {
+    [1] = { itemID = 12345, stackCount = 10, isLocked = false, isBound = false, hyperlink = "item:12345" },
+    [2] = { itemID = 12345, stackCount = 5, isLocked = false, isBound = false, hyperlink = "item:12345" }
+}
+mockGuildBank[2] = {
+    [1] = { itemID = 12345, stackCount = 5, itemLink = "item:12345" }
+}
+activeGuildBankTab = 2
+
+local origPickupGuildBankItem = _G.PickupGuildBankItem
+local move2Intercepted = false
+_G.PickupGuildBankItem = function(tab, slot)
+    if cursorState == "item" and cursorSrcInfo == mockContainers[0][2] then
+        move2Intercepted = true
+        local movedQty = cursorSrcInfo.heldSplit or 5
+        cursorSrcInfo.stackCount = cursorSrcInfo.stackCount - movedQty
+        cursorSrcInfo.heldSplit = nil
+        cursorState = nil
+        cursorItemId = nil
+        cursorSrcInfo = nil
+        return
+    end
+    origPickupGuildBankItem(tab, slot)
+end
+
+local test15aProgressCount = 0
+local test15aTimeout = false
+local test15aDone = false
+
+lib:Move({ ["i:12345"] = 15 }, "BagToGuildBank", function(event)
+    if event == "PROGRESS" then
+        test15aProgressCount = test15aProgressCount + 1
+    elseif event == "TIMEOUT_ERROR" then
+        test15aTimeout = true
+    elseif event == "DONE" then
+        test15aDone = true
+    end
+end)
+
+ticks = 0
+while frameShown and not move2Intercepted and ticks < 50 do
+    ticks = ticks + 1
+    if frameScript then
+        frameScript(nil, 0.05)
+    end
+end
+assert(move2Intercepted == true, "Test 15a: Move 2 was not intercepted")
+
+for _ = 1, 3 do
+    if frameShown and frameScript then
+        frameScript(nil, 0.05)
+    end
+    assert(test15aProgressCount == 1, "Test 15a: Premature PROGRESS before Move 2 destination confirmation")
+    assert(test15aDone == false, "Test 15a: Premature DONE before Move 2 destination confirmation")
+    assert(mockGuildBank[2][1].stackCount == 15, "Test 15a: Destination stack should remain 15 during delay")
+end
+
+-- Apply delayed server confirmation for Move 2
+mockGuildBank[2][1].stackCount = mockGuildBank[2][1].stackCount + 5
+
+ticks = 0
+while frameShown and ticks < 50 do
+    ticks = ticks + 1
+    if frameScript then
+        frameScript(nil, 0.05)
+    end
+end
+
+_G.PickupGuildBankItem = origPickupGuildBankItem
+
+assert(test15aDone == true, "Test 15a: BagToGuildBank move failed to complete")
+assert(test15aTimeout == false, "Test 15a: Unexpected timeout occurred")
+assert(test15aProgressCount == 2, "Test 15a: Expected 2 PROGRESS events, got " .. tostring(test15aProgressCount))
+assert(mockContainers[0][1].stackCount == 0, "Test 15a: Source slot 1 failed to empty")
+assert(mockContainers[0][2].stackCount == 0, "Test 15a: Source slot 2 failed to empty")
+assert(mockGuildBank[2][1].stackCount == 20, "Test 15a: Target slot failed to reach 20")
+print("[PASS] Sequential Partial-Stack Accumulation (BagToGuildBank delayed confirmation) test passed.")
+
+-- Test 15b: Sequential Partial-Stack Accumulation (BagToBank dropped Move 2)
+mockContainers[0] = {
+    [1] = { itemID = 12345, stackCount = 10, isLocked = false, isBound = false, hyperlink = "item:12345" },
+    [2] = { itemID = 12345, stackCount = 5, isLocked = false, isBound = false, hyperlink = "item:12345" }
+}
+mockContainers[-1] = {
+    [1] = { itemID = 12345, stackCount = 5, isLocked = false, isBound = false, hyperlink = "item:12345" }
+}
+
+local origPickupContainerItem = _G.C_Container.PickupContainerItem
+_G.C_Container.PickupContainerItem = function(bag, slot)
+    if cursorState == "item" and cursorSrcInfo == mockContainers[0][2] then
+        local movedQty = cursorSrcInfo.heldSplit or 5
+        cursorSrcInfo.stackCount = cursorSrcInfo.stackCount - movedQty
+        cursorSrcInfo.heldSplit = nil
+        cursorState = nil
+        cursorItemId = nil
+        cursorSrcInfo = nil
+        return
+    end
+    origPickupContainerItem(bag, slot)
+end
+
+local test15bProgressCount = 0
+local test15bTimeout = false
+local test15bDone = false
+
+lib:Move({ ["i:12345"] = 15 }, "BagToBank", function(event)
+    if event == "PROGRESS" then
+        test15bProgressCount = test15bProgressCount + 1
+    elseif event == "TIMEOUT_ERROR" then
+        test15bTimeout = true
+    elseif event == "DONE" then
+        test15bDone = true
+    end
+end)
+
+ticks = 0
+while frameShown and ticks < 200 do
+    ticks = ticks + 1
+    if frameScript then
+        frameScript(nil, 0.05)
+    end
+end
+
+_G.C_Container.PickupContainerItem = origPickupContainerItem
+
+assert(test15bTimeout == true, "Test 15b: Expected TIMEOUT_ERROR when Move 2 dropped")
+assert(test15bDone == true, "Test 15b: Expected DONE after timeout handling")
+assert(test15bProgressCount == 1, "Test 15b: Expected only 1 PROGRESS event, got " .. tostring(test15bProgressCount))
+assert(mockContainers[-1][1].stackCount == 15, "Test 15b: Bank destination stack should remain 15")
+print("[PASS] Sequential Partial-Stack Accumulation (BagToBank dropped Move 2) test passed.")
 
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")
