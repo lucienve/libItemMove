@@ -1639,4 +1639,168 @@ do
     print("[PASS] Reagent Bag (Bag 5) family resolution and crafting reagent compatibility tests passed.")
 end
 
+-- Test 19: Negative Item-Link IDs and Uncached Item Max Stack Fallback (Issue #8)
+do
+    local t19OrigGetItemMaxStackSizeByID = _G.C_Item.GetItemMaxStackSizeByID
+    local t19OrigCItemGetItemInfo = _G.C_Item.GetItemInfo
+    local t19OrigGetItemInfo = _G.GetItemInfo
+    local t19OrigPickupContainerItem = _G.C_Container.PickupContainerItem
+    local t19OrigPickupGuildBankItem = _G.PickupGuildBankItem
+    local t19OrigActiveGuildBankTab = activeGuildBankTab
+    local t19OrigMockContainers = mockContainers
+    local t19OrigMockGuildBank = mockGuildBank
+
+    -- 19a: Utils.IsItemMatching with negative suffixID, negative uniqueID, empty fields, and trailing bonusIDs
+    assert(Private.Utils.IsItemMatching("item:12345:0:0:0:0:0:-63", {
+        itemID = 12345,
+        itemLink = "item:12345:0:0:0:0:0:-64",
+    }) == false, "Test 19a: Distinct negative suffixIDs (-63 vs -64) must not match")
+
+    assert(Private.Utils.IsItemMatching("item:12345:0:0:0:0:0:-63", {
+        itemID = 12345,
+        itemLink = "item:12345:0:0:0:0:0:-63",
+    }) == true, "Test 19a: Identical negative suffixID plain strings must match")
+
+    assert(Private.Utils.IsItemMatching("item:12345:0:0:0:0:0:-63", {
+        itemID = 12345,
+        itemLink = "|cff1eff00|Hitem:12345:0:0:0:0:0:-63|h[Item of the Whale]|h|r",
+    }) == true, "Test 19a: Negative suffixID string must match full hyperlink")
+
+    assert(Private.Utils.IsItemMatching("item:12345::::::-63", {
+        itemID = 12345,
+        itemLink = "item:12345::::::-64",
+    }) == false, "Test 19a: Empty-field item strings with distinct negative suffixIDs must not match")
+
+    assert(Private.Utils.IsItemMatching("item:12345::::::-63", {
+        itemID = 12345,
+        itemLink = "|cff1eff00|Hitem:12345::::::-63|h[Item]|h|r",
+    }) == true, "Test 19a: Empty-field item string must match identical hyperlink")
+
+    assert(Private.Utils.IsItemMatching("|cffffffff|Hitem:12345:0:0:0:0:0:0:-987654:80|h[Item]|h|r", {
+        itemID = 12345,
+        itemLink = "|cffffffff|Hitem:12345:0:0:0:0:0:0:-987655:80|h[Item]|h|r",
+    }) == false, "Test 19a: Distinct negative uniqueIDs must not match")
+
+    assert(Private.Utils.IsItemMatching("|cffffffff|Hitem:12345:0:0:0:0:0:-63:0:70:0:0:0:1:3524|h[Item]|h|r", {
+        itemID = 12345,
+        itemLink = "|cffffffff|Hitem:12345:0:0:0:0:0:-63:0:70:0:0:0:1:3525|h[Item]|h|r",
+    }) == false, "Test 19a: Differing bonusIDs after a negative suffixID must not match")
+
+    local t19SlotWithNegSuffix = {
+        itemID = 12345,
+        itemLink = "|cff1eff00|Hitem:12345:0:0:0:0:0:-63|h[Item of the Whale]|h|r",
+    }
+    assert(Private.Utils.IsItemMatching(12345, t19SlotWithNegSuffix) == true, "Test 19a: Numeric itemID must still match")
+    assert(Private.Utils.IsItemMatching("12345", t19SlotWithNegSuffix) == true, "Test 19a: String numeric ID must still match")
+    assert(Private.Utils.IsItemMatching("i:12345", t19SlotWithNegSuffix) == true, "Test 19a: i:ID must still match")
+    assert(Private.Utils.IsItemMatching("item:12345", t19SlotWithNegSuffix) == true, "Test 19a: Base item:ID must still match")
+
+    -- 19b: Utils.GetItemMaxStack fallback to 1 on uncached items and partial slot scanning
+    local function t19MakeItemInfo(maxStack)
+        return "Test Item", "item:1", 1, 1, 1, "Armor", "Plate", maxStack, "", 1, 0, 4, 0, 0, 0, nil, false, ""
+    end
+
+    _G.C_Item.GetItemMaxStackSizeByID = function(item)
+        if item == 88881 then return 20 end
+        return nil
+    end
+    _G.C_Item.GetItemInfo = function(item)
+        if item == 88882 then return t19MakeItemInfo(200) end
+        return nil
+    end
+    _G.GetItemInfo = function(item)
+        if item == 88883 then return t19MakeItemInfo(10) end
+        return nil
+    end
+
+    assert(Private.Utils.GetItemMaxStack(99999) == 1, "Test 19b: Uncached item must default max stack to 1")
+    assert(Private.Utils.GetItemMaxStack(nil) == 1, "Test 19b: nil itemInput must default max stack to 1")
+    assert(Private.Utils.GetItemMaxStack("invalid") == 1, "Test 19b: Invalid itemInput must default max stack to 1")
+    assert(Private.Utils.GetItemMaxStack(88881) == 20, "Test 19b: C_Item.GetItemMaxStackSizeByID must return 20")
+    assert(Private.Utils.GetItemMaxStack(88882) == 200, "Test 19b: C_Item.GetItemInfo fallback must return 200")
+    assert(Private.Utils.GetItemMaxStack(88883) == 10, "Test 19b: Legacy GetItemInfo fallback must return 10")
+
+    mockContainers = {
+        [0] = {},
+        [-1] = {
+            [1] = { itemID = 99999, stackCount = 1, isLocked = false, isBound = false, hyperlink = "item:99999" },
+        },
+    }
+    mockGuildBank[2] = {
+        [1] = { itemID = 99999, stackCount = 1, itemLink = "item:99999" },
+    }
+    activeGuildBankTab = 2
+
+    local t19BankPartials = {}
+    Private.BaseContext:ScanPartialSlots({ -1 }, "i:99999", t19BankPartials)
+    assert(#t19BankPartials == 0, "Test 19b: ScanPartialSlots must emit 0 partials for uncached stackCount=1 item")
+
+    local t19GbPartials = {}
+    Private.BagToGuildBank:GetPartialSlots("i:99999", t19GbPartials)
+    assert(#t19GbPartials == 0, "Test 19b: BagToGuildBank:GetPartialSlots must emit 0 partials for uncached stackCount=1 item")
+
+    -- 19c: End-to-end BagToBank and BagToGuildBank moves for uncached non-stackable items
+    _G.C_Container.PickupContainerItem = function(bag, slot)
+        if cursorState == "item" and cursorItemId == 99999 and mockContainers[bag] and mockContainers[bag][slot]
+            and mockContainers[bag][slot].stackCount and mockContainers[bag][slot].stackCount > 0 then
+            return
+        end
+        t19OrigPickupContainerItem(bag, slot)
+    end
+    _G.PickupGuildBankItem = function(tab, slot)
+        if cursorState == "item" and cursorItemId == 99999 and mockGuildBank[tab] and mockGuildBank[tab][slot]
+            and mockGuildBank[tab][slot].stackCount and mockGuildBank[tab][slot].stackCount > 0 then
+            return
+        end
+        t19OrigPickupGuildBankItem(tab, slot)
+    end
+
+    mockContainers[0][1] = { itemID = 99999, stackCount = 1, isLocked = false, isBound = false, hyperlink = "item:99999" }
+    local t19B2bDone = false
+    local t19B2bTimeout = false
+    lib:Move({ ["i:99999"] = 1 }, "BagToBank", function(event)
+        if event == "TIMEOUT_ERROR" then t19B2bTimeout = true end
+        if event == "DONE" then t19B2bDone = true end
+    end)
+    local t19Ticks = 0
+    while frameShown and t19Ticks < 40 do
+        t19Ticks = t19Ticks + 1
+        if frameScript then frameScript(nil, 0.05) end
+    end
+    assert(t19B2bDone == true and t19B2bTimeout == false, "Test 19c: BagToBank uncached non-stackable item must complete without TIMEOUT_ERROR")
+    assert(mockContainers[0][1] == nil or mockContainers[0][1].stackCount == 0, "Test 19c: BagToBank source slot must be emptied")
+    assert(mockContainers[-1][1] and mockContainers[-1][1].stackCount == 1, "Test 19c: Occupied bank slot 1 must remain untouched")
+    assert(mockContainers[-1][2] and mockContainers[-1][2].itemID == 99999 and mockContainers[-1][2].stackCount == 1,
+        "Test 19c: Uncached non-stackable item must route to empty bank slot 2")
+
+    mockContainers[0][1] = { itemID = 99999, stackCount = 1, isLocked = false, isBound = false, hyperlink = "item:99999" }
+    local t19B2gbDone = false
+    local t19B2gbTimeout = false
+    lib:Move({ ["i:99999"] = 1 }, "BagToGuildBank", function(event)
+        if event == "TIMEOUT_ERROR" then t19B2gbTimeout = true end
+        if event == "DONE" then t19B2gbDone = true end
+    end)
+    t19Ticks = 0
+    while frameShown and t19Ticks < 40 do
+        t19Ticks = t19Ticks + 1
+        if frameScript then frameScript(nil, 0.05) end
+    end
+    assert(t19B2gbDone == true and t19B2gbTimeout == false, "Test 19c: BagToGuildBank uncached non-stackable item must complete without TIMEOUT_ERROR")
+    assert(mockContainers[0][1] == nil or mockContainers[0][1].stackCount == 0, "Test 19c: BagToGuildBank source slot must be emptied")
+    assert(mockGuildBank[2][1] and mockGuildBank[2][1].stackCount == 1, "Test 19c: Occupied guild bank slot 1 must remain untouched")
+    assert(mockGuildBank[2][2] and mockGuildBank[2][2].itemID == 99999 and mockGuildBank[2][2].stackCount == 1,
+        "Test 19c: Uncached non-stackable item must route to empty guild bank slot 2")
+
+    -- Restore Test 19 globals
+    _G.C_Item.GetItemMaxStackSizeByID = t19OrigGetItemMaxStackSizeByID
+    _G.C_Item.GetItemInfo = t19OrigCItemGetItemInfo
+    _G.GetItemInfo = t19OrigGetItemInfo
+    _G.C_Container.PickupContainerItem = t19OrigPickupContainerItem
+    _G.PickupGuildBankItem = t19OrigPickupGuildBankItem
+    activeGuildBankTab = t19OrigActiveGuildBankTab
+    mockContainers = t19OrigMockContainers
+    mockGuildBank = t19OrigMockGuildBank
+    print("[PASS] Negative item-link IDs and uncached item max stack fallback tests passed.")
+end
+
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")

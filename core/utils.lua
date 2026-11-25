@@ -63,11 +63,11 @@ function Utils.IsItemMatching(itemInput, slotInfo)
     end
 
     -- If itemInput is a full item link or complex string (containing suffix/bonus IDs), compare itemLink
-    if type(itemInput) == "string" and (itemInput:find("|Hitem:") or itemInput:find("item:%d+:%d+")) then
+    if type(itemInput) == "string" and (itemInput:find("|Hitem:") or itemInput:find("item:%d+:")) then
         if slotInfo.itemLink then
             -- Normalize item string for comparison
-            local inputClean = itemInput:match("(item:[%d:]+)")
-            local linkClean = slotInfo.itemLink:match("(item:[%d:]+)")
+            local inputClean = itemInput:match("(item:[%-%d:]+)")
+            local linkClean = slotInfo.itemLink:match("(item:[%-%d:]+)")
             if inputClean and linkClean then
                 return inputClean == linkClean
             end
@@ -79,10 +79,10 @@ end
 
 --- Queries maximum stack size for an item ID or link.
 --- @param itemInput string|number
---- @return number maxStack Maximum stack count (defaults to 100 if unavailable)
+--- @return number maxStack Maximum stack count (defaults to 1 if unavailable)
 function Utils.GetItemMaxStack(itemInput)
     local itemID = Utils.GetItemIdFromString(itemInput)
-    if not itemID then return 100 end
+    if not itemID then return 1 end
 
     if C_Item and C_Item.GetItemMaxStackSizeByID then
         local maxStack = C_Item.GetItemMaxStackSizeByID(itemID)
@@ -100,7 +100,7 @@ function Utils.GetItemMaxStack(itemInput)
         if maxStack and maxStack > 0 then return maxStack end
     end
 
-    return 100
+    return 1
 end
 
 --- Determines whether an item's family is compatible with a bag's specialty family bitmask.

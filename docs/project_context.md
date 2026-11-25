@@ -119,3 +119,8 @@ character bags, character bank, Guild Bank, and account Warbanks.
   (`isCraftingReagent == true` from `C_Item.GetItemInfo`) are accepted regardless
   of legacy `GetItemFamily` bitmasks, with regression tests in
   [mock_test.lua](../tests/mock_test.lua) (Issue #6).
+- Fixed `Utils.IsItemMatching` in [utils.lua](../core/utils.lua) to handle
+  empty-field item strings (`item:<id>:`) and preserve negative `suffixID` /
+  `uniqueID` values via `(item:[%-%d:]+)`, and changed `Utils.GetItemMaxStack`
+  to fail closed to `1` instead of `100` for uncached items, with regression
+  tests in [mock_test.lua](../tests/mock_test.lua) (Issue #8).
