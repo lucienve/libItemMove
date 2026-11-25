@@ -110,3 +110,12 @@ character bags, character bank, Guild Bank, and account Warbanks.
   [bag_to_bank.lua](../contexts/bag_to_bank.lua) and
   [bank_to_bag.lua](../contexts/bank_to_bag.lua) with regression tests in
   [mock_test.lua](../tests/mock_test.lua) (Issue #3).
+- Fixed Retail (`120100`) and WoW Forever (`16001`) Reagent Bag (Bag `5`)
+  family resolution and compatibility matching in
+  [api_adapter.lua](../core/api_adapter.lua), [utils.lua](../core/utils.lua),
+  [mover.lua](../mover.lua), and
+  [base_context.lua](../contexts/base_context.lua) so uncached or zero-family
+  Reagent Bags default to `2048` (`0x800`) instead of `0` and crafting reagents
+  (`isCraftingReagent == true` from `C_Item.GetItemInfo`) are accepted regardless
+  of legacy `GetItemFamily` bitmasks, with regression tests in
+  [mock_test.lua](../tests/mock_test.lua) (Issue #6).

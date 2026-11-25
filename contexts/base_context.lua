@@ -173,11 +173,13 @@ function BaseContext:ScanPartialSlots(containers, itemString, partialSlotsTable)
     local maxStack = Utils.GetItemMaxStack(itemID)
     if maxStack <= 1 then return end -- Non-stackable items have no partial stacks
 
+    local itemFamily = APIAdapter.GetItemFamily(itemID)
+    local isCraftingReagent = APIAdapter.IsCraftingReagent(itemID)
+
     for _, bag in ipairs(containers) do
         local bagFamily = self:GetBagFamily(bag)
-        local itemFamily = APIAdapter.GetItemFamily(itemID)
 
-        if Utils.IsFamilyCompatible(itemFamily, bagFamily) then
+        if Utils.IsFamilyCompatible(itemFamily, bagFamily, isCraftingReagent) then
             local numSlots = APIAdapter.GetContainerNumSlots(bag)
             for slot = 1, numSlots do
                 local info = APIAdapter.GetContainerItemInfo(bag, slot)

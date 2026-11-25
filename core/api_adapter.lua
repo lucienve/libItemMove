@@ -4,6 +4,45 @@ Private = Private or {}
 local APIAdapter = {}
 Private.APIAdapter = APIAdapter
 
+local REAGENT_BAG_FAMILY = (Private.Utils and Private.Utils.REAGENT_BAG_FAMILY) or 2048
+
+--- Returns true if the current WoW client exposes a dedicated player Reagent Bag slot.
+--- Classic Era and Mists Classic define Enum.BagIndex.ReagentBag = 5 alongside legacy bank bags at 5,
+--- so availability is gated by NUM_REAGENTBAG_SLOTS or REAGENTBAG_CONTAINER == 5 without a legacy bank offset.
+--- @return boolean hasReagentBag
+local function HasReagentBagSlot()
+    local bankBagOffset = _G["ITEM_INVENTORY_BANK_BAG_OFFSET"]
+    local hasLegacyBankAt5 = type(bankBagOffset) == "number" and bankBagOffset > 0 and bankBagOffset < 5
+    local numReagentBagSlots = _G["NUM_REAGENTBAG_SLOTS"]
+        or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumReagentBagSlots)
+        or 0
+    return numReagentBagSlots > 0 or (_G["REAGENTBAG_CONTAINER"] == 5 and not hasLegacyBankAt5)
+end
+
+--- Returns the container ID for the player Reagent Bag slot (defaults to 5).
+--- @return number reagentBagID
+local function GetReagentBagID()
+    local bagIndex = Enum and Enum.BagIndex --[[@as table<string, number?>]]
+    if type(bagIndex) == "table" and type(bagIndex["ReagentBag"]) == "number" then
+        return bagIndex["ReagentBag"]
+    end
+    local reagentContainer = _G["REAGENTBAG_CONTAINER"]
+    if type(reagentContainer) == "number" then
+        return reagentContainer
+    end
+    return 5
+end
+
+--- Returns true when bag refers to the player's Reagent Bag slot on clients that support it.
+--- @param bag number Container ID
+--- @return boolean isReagentBag
+local function IsReagentBag(bag)
+    if not HasReagentBagSlot() then
+        return false
+    end
+    return bag == GetReagentBagID()
+end
+
 --- Returns list of player character bag container IDs dynamically based on WoW version.
 --- Classic Era (1.15.x) & Mists of Pandaria Classic (5.5.x): Bag 0 (Backpack) + Bags 1..4 = { 0, 1, 2, 3, 4 }
 --- Modern Retail (11.x/12.x): Bag 0 + Bags 1..4 + Bag 5 (Reagent Bag) = { 0, 1, 2, 3, 4, 5 }
@@ -14,12 +53,8 @@ function APIAdapter.GetPlayerBagIDs()
     for i = 1, numBagSlots do
         table.insert(bags, i)
     end
-    -- Check if Reagent Bag (Bag 5) is available in Retail (where NUM_REAGENTBAG_SLOTS > 0 or REAGENTBAG_CONTAINER == 5)
-    local bankBagOffset = _G["ITEM_INVENTORY_BANK_BAG_OFFSET"]
-    local hasLegacyBankAt5 = type(bankBagOffset) == "number" and bankBagOffset > 0 and bankBagOffset < 5
-    local numReagentBagSlots = _G["NUM_REAGENTBAG_SLOTS"] or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumReagentBagSlots) or 0
-    if numReagentBagSlots > 0 or (_G["REAGENTBAG_CONTAINER"] == 5 and not hasLegacyBankAt5) then
-        table.insert(bags, 5)
+    if HasReagentBagSlot() then
+        table.insert(bags, GetReagentBagID())
     end
     return bags
 end
@@ -151,8 +186,7 @@ function APIAdapter.GetBankContainerIDs()
         startBankBag = bankBagOffset + 1
     else
         startBankBag = numBagSlots + 1
-        local numReagentBagSlots = _G["NUM_REAGENTBAG_SLOTS"] or (_G.Constants and _G.Constants.InventoryConstants and _G.Constants.InventoryConstants.NumReagentBagSlots) or 0
-        if (_G["REAGENTBAG_CONTAINER"] and _G["REAGENTBAG_CONTAINER"] == 5) or numReagentBagSlots > 0 then
+        if HasReagentBagSlot() then
             startBankBag = startBankBag + 1
         end
     end
@@ -354,6 +388,25 @@ function APIAdapter.GetItemFamily(itemInput)
     return 0
 end
 
+--- Queries whether an item is flagged as a crafting reagent (17th return of GetItemInfo).
+--- Fails closed (false) when itemInput is nil, uncached, or GetItemInfo is unavailable.
+--- @param itemInput? string|number Item ID or item link
+--- @return boolean isCraftingReagent
+function APIAdapter.IsCraftingReagent(itemInput)
+    if not itemInput then
+        return false
+    end
+    if C_Item and C_Item.GetItemInfo then
+        local isCraftingReagent = select(17, C_Item.GetItemInfo(itemInput))
+        return isCraftingReagent == true
+    elseif _G["GetItemInfo"] then
+        local legacyGetItemInfo = _G["GetItemInfo"]
+        local isCraftingReagent = select(17, legacyGetItemInfo(itemInput))
+        return isCraftingReagent == true
+    end
+    return false
+end
+
 --- Returns specialty bag family bitmask for a container ID.
 --- @param bag number Container ID
 --- @return number family Specialty family bitmask (0 for general bags)
@@ -365,14 +418,29 @@ function APIAdapter.GetBagItemFamily(bag)
         return 0
     end
 
+    local isReagentBag = IsReagentBag(bag)
+
     if C_Container and C_Container.GetContainerNumFreeSlots then
         local _, bagFamily = C_Container.GetContainerNumFreeSlots(bag)
         if type(bagFamily) == "number" then
+            if isReagentBag and bagFamily == 0 then
+                if Private.DebugLog then
+                    Private.DebugLog("GetBagItemFamily(%s): Reagent Bag reported family 0, returning %d", tostring(bag), REAGENT_BAG_FAMILY)
+                end
+                return REAGENT_BAG_FAMILY
+            end
             if Private.DebugLog then
                 Private.DebugLog("GetBagItemFamily(%s): GetContainerNumFreeSlots returned family = %s", tostring(bag), tostring(bagFamily))
             end
             return bagFamily
         end
+    end
+
+    if isReagentBag then
+        if Private.DebugLog then
+            Private.DebugLog("GetBagItemFamily(%s): Reagent Bag family unavailable, defaulting to %d", tostring(bag), REAGENT_BAG_FAMILY)
+        end
+        return REAGENT_BAG_FAMILY
     end
 
     if IsModernBankTab(bag) then

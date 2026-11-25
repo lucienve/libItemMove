@@ -5,6 +5,7 @@ local Utils = {}
 Private.Utils = Utils
 
 Utils.SLOT_ID_MULTIPLIER = 1000
+Utils.REAGENT_BAG_FAMILY = 2048 -- 0x800 Reagent Bag specialty family flag
 
 --- Packs a separate bag index and slot index into a single packed SlotId integer.
 --- @param bag number Container/Bag ID
@@ -105,14 +106,20 @@ end
 --- Determines whether an item's family is compatible with a bag's specialty family bitmask.
 --- @param itemFamily number Item family bitmask from GetItemFamily
 --- @param bagFamily number Bag specialty family bitmask from GetBagItemFamily
+--- @param isCraftingReagent? boolean True if item is flagged as a crafting reagent via GetItemInfo
 --- @return boolean compatible True if bag can accept the item
-function Utils.IsFamilyCompatible(itemFamily, bagFamily)
+function Utils.IsFamilyCompatible(itemFamily, bagFamily, isCraftingReagent)
     bagFamily = bagFamily or 0
     itemFamily = itemFamily or 0
 
-    -- General bags (family == 0) accept any non-specialty item
+    -- General bags (family == 0) accept any item
     if bagFamily == 0 then
         return true
+    end
+
+    -- Reagent Bags (family == 2048) accept crafting reagents regardless of legacy item family bitmask
+    if bagFamily == Utils.REAGENT_BAG_FAMILY then
+        return isCraftingReagent == true
     end
 
     -- Specialty bags accept items whose bitmask overlaps with bag family
