@@ -112,7 +112,7 @@ GetContainerItemInfo = GetContainerItemInfo
 ---@type fun(bag: number, slot: number): number?
 GetContainerItemID = GetContainerItemID
 
----@type fun(itemInfo: string|number): string?, string?, number?, number?, number?, string?, string?, number?, string?, number?, number?, number?, number?, number?, number?, number?, boolean?
+---@type fun(itemInfo: string|number): string?, string?, number?, number?, number?, string?, string?, number?, string?, number?, number?, number?, number?, number?, number?, number?, boolean?, string?
 GetItemInfo = GetItemInfo
 
 ---@type fun(bag: number, slot: number, count: number)
