@@ -213,7 +213,7 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
 
             if context.isGuildBank then
                 movedSlotId = moveIndex
-                break -- Enforce Guild Bank throttling constraint: 1 move per yield cycle
+                break -- Enforce Guild Bank throttling: 1 move per verification cycle
             end
         end
 
@@ -294,7 +294,7 @@ function Mover.StartMove(moveQueue, context, callback, dispatchGlobalEvent)
 end
 
 --- Threaded cooperative multi-tab move runner loop.
---- @param moveQueue table Map of tabIndex to single-tab MoveQueue
+--- @param moveQueue MultiTabMoveQueue Map of tabIndex to single-tab MoveQueue
 --- @param context MoveContext Move strategy context
 --- @param callback function? Direct per-move callback
 --- @param dispatchGlobalEvent function? CallbackHandler dispatcher
@@ -379,7 +379,7 @@ function Mover.MoveMultiTabThread(moveQueue, context, callback, dispatchGlobalEv
 end
 
 --- Initiates a multi-tab move task.
---- @param moveQueue table Map of tabIndex to single-tab MoveQueue
+--- @param moveQueue MultiTabMoveQueue Map of tabIndex to single-tab MoveQueue
 --- @param context MoveContext Strategy context
 --- @param callback function? Per-move callback function
 --- @param dispatchGlobalEvent function? CallbackHandler dispatcher function

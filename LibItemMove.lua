@@ -76,7 +76,7 @@ function lib:GetContext(direction)
 end
 
 --- Initiates an asynchronous cooperative item movement transaction.
---- @param moveQueue MoveQueue Map of itemString to quantity
+--- @param moveQueue MoveQueue|MultiTabMoveQueue Map of itemString to quantity, or tabIndex to MoveQueue for multi-tab Guild Bank moves
 --- @param context MoveContext|string Move strategy context or direction string
 --- @param callback MoveCallbackFun? Direct per-move callback function
 function lib:Move(moveQueue, context, callback)
@@ -107,8 +107,10 @@ function lib:Move(moveQueue, context, callback)
         if type(Mover.StartMultiTabMove) ~= "function" then
             error("LibItemMove: Mover.StartMultiTabMove is not implemented.")
         end
+        ---@cast moveQueue MultiTabMoveQueue
         Mover.StartMultiTabMove(moveQueue, ctxObj, callback, DispatchGlobalEvent)
     else
+        ---@cast moveQueue MoveQueue
         Mover.StartMove(moveQueue, ctxObj, callback, DispatchGlobalEvent)
     end
 end

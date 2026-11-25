@@ -25,10 +25,11 @@ safety.
   placing items into specialty bags (Herb, Mining, Reagent bags) before general
   bags.
 - **Guild Bank Rate-Limit Throttling**: Limits Guild Bank transfers to 1 move
-  per yield cycle to avoid server packet drops.
+  per verification cycle with a 0.2-second post-verification cooldown to avoid
+  server packet drops.
 - **Transaction Verification & Lock Recovery**: Verifies source quantity
-  reduction and destination item ID matching with a 2-second timeout window and
-  10-retry stuck cursor recovery.
+  reduction, destination item ID matching, destination stack count, and an empty
+  cursor with a 5-second timeout window and 10-retry stuck cursor recovery.
 - **Hybrid Callback System**: Supports per-transaction functional callbacks and
   Ace3 `CallbackHandler-1.0` event bus subscriptions.
 - **Diagnostic Debug Mode**: Exposes a `Debug` property on the library to print
@@ -54,11 +55,12 @@ Include the library's XML manifest in your addon's XML layout file (e.g.
 </Ui>
 ```
 
-> [!NOTE] The World of Warcraft engine TOC parser only loads `.lua` and `.xml`
-> files and does not support nested `.toc` manifests. Therefore, embedded
-> libraries should always be loaded via XML `<Include>`. If your addon is pure
-> Lua without an XML loader, you can directly list the library script files from
-> `libItemMove.xml` in your parent addon's `.toc`.
+> [!NOTE]
+> The World of Warcraft engine TOC parser only loads `.lua` and `.xml` files and
+> does not support nested `.toc` manifests. Therefore, embedded libraries should
+> always be loaded via XML `<Include>`. If your addon is pure Lua without an XML
+> loader, you can directly list the library script files from `libItemMove.xml`
+> in your parent addon's `.toc`.
 
 ---
 

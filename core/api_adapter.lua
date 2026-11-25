@@ -45,7 +45,7 @@ end
 
 --- Returns list of player character bag container IDs dynamically based on WoW version.
 --- Classic Era (1.15.x) & Mists of Pandaria Classic (5.5.x): Bag 0 (Backpack) + Bags 1..4 = { 0, 1, 2, 3, 4 }
---- Modern Retail (11.x/12.x): Bag 0 + Bags 1..4 + Bag 5 (Reagent Bag) = { 0, 1, 2, 3, 4, 5 }
+--- Modern Retail (11.x/12.x) & WoW Forever (1.60.x): Bag 0 + Bags 1..4 + Bag 5 (Reagent Bag) = { 0, 1, 2, 3, 4, 5 }
 --- @return number[] playerBags
 function APIAdapter.GetPlayerBagIDs()
     local numBagSlots = _G["NUM_BAG_SLOTS"] or 4
@@ -153,11 +153,11 @@ end
 
 --- Returns list of character bank container IDs dynamically based on WoW version.
 --- Classic Era / Mists Classic: -1 (BANK_CONTAINER), optional -3 (Reagent Bank), and Bank Bags 5..11
---- Modern Retail (11.0+): CharacterBankTab_1..6 (6..11) via C_Bank or Enum.BagIndex
+--- Modern Retail (11.2+ / 12.x): CharacterBankTab_1..6 (6..11) via C_Bank or Enum.BagIndex
 --- WoW Forever (16001): CharacterBankTab_1..9 (6..14) via C_Bank or Enum.BagIndex
 --- @return number[] bankContainers
 function APIAdapter.GetBankContainerIDs()
-    -- Modern Retail (11.0+) and WoW Forever (16001): trust C_Bank directly (including {} when 0 tabs are purchased)
+    -- Modern Retail (11.2+ / 12.x) and WoW Forever (16001): trust C_Bank directly (including {} when 0 tabs are purchased)
     local bankTypeCharacter = (Enum and Enum.BankType and Enum.BankType.Character) or 0
     local purchasedTabs = FetchPurchasedBankTabs(bankTypeCharacter)
     if purchasedTabs then
@@ -172,7 +172,7 @@ function APIAdapter.GetBankContainerIDs()
     -- Classic / Legacy Bank layout
     local containers = { -1 }
 
-    -- Reagent Bank (-3) in legacy expansions (WoD through Shadowlands)
+    -- Reagent Bank (-3) in legacy expansions (WoD through Dragonflight / TWW 11.1.x)
     local isUnlockedFn = _G["IsReagentBankUnlocked"]
     if type(isUnlockedFn) == "function" and isUnlockedFn() then
         table.insert(containers, _G["REAGENTBANK_CONTAINER"] or -3)
@@ -200,7 +200,7 @@ end
 
 --- Returns list of account (Warbank) container IDs dynamically based on WoW version.
 --- Classic Era / Mists Classic: {} (Warbank unsupported)
---- Modern Retail (11.0+): AccountBankTab_1..5 (12..16) via C_Bank or Enum.BagIndex
+--- Modern Retail (11.2+ / 12.x): AccountBankTab_1..5 (12..16) via C_Bank or Enum.BagIndex
 --- WoW Forever (16001): AccountBankTab_1..9 (15..23) via C_Bank or Enum.BagIndex
 --- @return number[] warbankContainers
 function APIAdapter.GetWarbankContainerIDs()
@@ -362,7 +362,7 @@ function APIAdapter.GetCursorInfo()
     return nil
 end
 
---- Clears cursor contents, destroying/returning items held on cursor.
+--- Clears cursor contents, returning items held on cursor to their source slots.
 function APIAdapter.ClearCursor()
     local clearCursor = _G["ClearCursor"]
     if clearCursor then
@@ -371,7 +371,7 @@ function APIAdapter.ClearCursor()
 end
 
 --- Queries specialty item family bitmask for an item link or ID.
---- @param itemInput string|number Item ID or item link
+--- @param itemInput? string|number Item ID or item link
 --- @return number family Bitmask integer (0 for general items)
 function APIAdapter.GetItemFamily(itemInput)
     if not itemInput then return 0 end

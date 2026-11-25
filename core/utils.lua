@@ -130,7 +130,7 @@ function Utils.IsFamilyCompatible(itemFamily, bagFamily, isCraftingReagent)
     if bit and bit.band then
         return bit.band(itemFamily, bagFamily) ~= 0
     else
-        -- Fallback for environments without bit library: exact match or modulo check
+        -- Fallback for environments without bit library: exact family match
         return itemFamily == bagFamily
     end
 end

@@ -10,14 +10,19 @@
 
 --- Table describing an individual slot movement transaction
 ---@class MoveData
+---@field src SlotId Packed source slot ID
 ---@field target SlotId Packed destination slot ID
 ---@field qty number Quantity to move
 ---@field endQty number Expected source slot quantity remaining after move
----@field item string Item string identifier (e.g. "i:12345")
+---@field expectedDestQty number Expected destination stack quantity after move
+---@field item string|number Item string or numeric ID identifier (e.g. "i:12345")
 ---@field isPartial boolean True if merging into an existing partial stack
 
 --- Map of item identifiers to quantity to move: { [itemString]: quantity }
----@alias MoveQueue table<string, number>
+---@alias MoveQueue table<string|number, number>
+
+--- Map of Guild Bank tab indices to single-tab move queues
+---@alias MultiTabMoveQueue table<number, MoveQueue>
 
 --- Abstract strategy interface for container movement directions
 ---@class MoveContext
@@ -56,11 +61,11 @@
 ---@field callbacks table? CallbackHandler instance
 ---@field encode_bagslot fun(bag: number, slot: number): SlotId
 ---@field decode_bagslot fun(slotId: SlotId): number, number
----@field Move fun(self: LibItemMove, moveQueue: MoveQueue, context: MoveContext|string, callback?: MoveCallbackFun)
+---@field Move fun(self: LibItemMove, moveQueue: MoveQueue|MultiTabMoveQueue, context: MoveContext|string, callback?: MoveCallbackFun)
 ---@field GetContext fun(self: LibItemMove, direction: string): MoveContext
----@field RegisterCallback fun(self: LibItemMove, event: string, method?: string|function, ...: any)
----@field UnregisterCallback fun(self: LibItemMove, event: string)
----@field UnregisterAllCallbacks fun(self: LibItemMove)
+---@field RegisterCallback fun(target: table, event: string, method?: string|function, ...: any)
+---@field UnregisterCallback fun(target: table, event: string)
+---@field UnregisterAllCallbacks fun(target: table)
 ---@field Debug boolean? Whether debug logs are enabled
 
 --- Private internal namespace shared across addon files

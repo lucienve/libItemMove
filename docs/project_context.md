@@ -136,3 +136,11 @@ character bags, character bank, Guild Bank, and account Warbanks.
   `SplitGuildBankItem` for partial stacks (`currentQty > 1 and quantity <
   currentQty`), with regression tests in
   [mock_test.lua](../tests/mock_test.lua) (Issue #7).
+- Reconciled [README.md](../README.md), [api_guide.md](api_guide.md),
+  [library_design.md](library_design.md), LuaLS annotations in
+  [types.lua](../core/types.lua) and [LibItemMove.lua](../LibItemMove.lua), and
+  inline code comments across core and context modules with the current
+  implementation (5s timeouts, 10-retry cursor recovery, 0.2s Guild Bank
+  cooldown, Warbank/Forever container IDs, Reagent Bag `isCraftingReagent`
+  matching, GFM alert syntax), and fixed the `nil` case loop in Test 18d Case 3
+  of [mock_test.lua](../tests/mock_test.lua).

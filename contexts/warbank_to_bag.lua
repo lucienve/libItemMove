@@ -24,7 +24,7 @@ function WarbankToBag:GetWarbankContainers()
     return APIAdapter.GetWarbankContainerIDs()
 end
 
---- Checks if player can access the Account Warbank.
+--- Checks if player can access the Account Warbank (returns false when C_Bank.CanUseBank is unavailable).
 --- @return boolean
 function WarbankToBag:HasPermission()
     if C_Bank and C_Bank.CanUseBank then
@@ -63,7 +63,7 @@ function WarbankToBag:PickupItem(bag, slot)
     APIAdapter.PickupContainerItem(bag, slot)
 end
 
---- Returns current stack quantity at target slot ID.
+--- Returns current stack quantity at slot ID.
 --- @param slotId SlotId
 --- @return number quantity Stack count (0 if empty)
 function WarbankToBag:GetSlotQuantity(slotId)

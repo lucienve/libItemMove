@@ -408,7 +408,7 @@ cursorState = nil
 cursorItemId = nil
 print("[PASS] Cursor Hold Early Abort test passed.")
 
--- Test 7: Guild Bank vs Player Bag API Mapping test passed
+-- Test 7: Guild Bank vs Player Bag API Mapping
 local b2gb = Private.BagToGuildBank
 local originalGetGuildBankItemInfo = _G.GetGuildBankItemInfo
 _G.GetGuildBankItemInfo = function(tab, slot) return nil, 77 end
@@ -1222,17 +1222,17 @@ assert(#warbankIterSlots == 1 and warbankIterSlots[1] == lib.encode_bagslot(0, 2
     "Test 17c: BagToWarbank:SlotIterator must skip disallowed slot (0,1) and allow Warbound isBound=true slot (0,2)")
 
 local b2wTimeout = false
-local b2wDone = false
+local b2w17Done = false
 lib:Move({ ["i:12345"] = 10 }, "BagToWarbank", function(event)
     if event == "TIMEOUT_ERROR" then b2wTimeout = true end
-    if event == "DONE" then b2wDone = true end
+    if event == "DONE" then b2w17Done = true end
 end)
 ticks = 0
 while frameShown and ticks < 30 do
     ticks = ticks + 1
     if frameScript then frameScript(nil, 0.05) end
 end
-assert(b2wDone == true and b2wTimeout == false, "Test 17c: BagToWarbank move must complete without TIMEOUT_ERROR")
+assert(b2w17Done == true and b2wTimeout == false, "Test 17c: BagToWarbank move must complete without TIMEOUT_ERROR")
 assert(mockContainers[0][1].stackCount == 10, "Test 17c: Disallowed slot (0,1) must remain untouched")
 assert(mockContainers[0][2].stackCount == 0, "Test 17c: Allowed Warbound slot (0,2) must be moved")
 assert(mockContainers[12][1] and mockContainers[12][1].stackCount == 10, "Test 17c: Warbank tab 12 slot 1 must receive 10")
@@ -1546,12 +1546,9 @@ do
     assert(mockContainers[5][1].stackCount == 10, "Test 18d: Bag 5 partial stack must consolidate to 10")
 
     -- Case 3: Uncached Bag 5 (GetContainerNumFreeSlots returns 0 or nil) must NEVER accept non-reagents or uncached items
-    for _, bag5Ret in ipairs({ 0, nil }) do
-        if bag5Ret == nil then
-            t18Bag5FamilyReturn = nil
-        else
-            t18Bag5FamilyReturn = bag5Ret
-        end
+    for _, bag5Case in ipairs({ 0, false }) do
+        local bag5Ret = bag5Case or nil
+        t18Bag5FamilyReturn = bag5Ret
         mockContainers[0] = {}
         mockContainers[5] = {}
         mockContainers[6] = {

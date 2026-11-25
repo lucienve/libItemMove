@@ -18,6 +18,7 @@ cursor safety.
    - [Example A: Moving Items from Bags to Character Bank](#example-a-moving-items-from-bags-to-character-bank)
    - [Example B: Withdrawing Items from Character Bank to Bags](#example-b-withdrawing-items-from-character-bank-to-bags)
    - [Example C: Depositing Items into Guild Bank (Rate-Limited)](#example-c-depositing-items-into-guild-bank-rate-limited)
+   - [Example C.2: Sequential Multi-Tab Guild Bank Transfers](#example-c2-sequential-multi-tab-guild-bank-transfers)
    - [Example D: Transferring Items to Account Warbank](#example-d-transferring-items-to-account-warbank)
    - [Example E: Global Event Subscriptions via CallbackHandler-1.0](#example-e-global-event-subscriptions-via-callbackhandler-10)
 6. [Debugging & Diagnostic Logs](#6-debugging--diagnostic-logs)
@@ -39,8 +40,9 @@ tag:
 </Ui>
 ```
 
-> [!NOTE] The World of Warcraft engine TOC parser only loads `.lua` and `.xml`
-> files; it does not process nested `.toc` manifests. As with other major WoW
+> [!NOTE]
+> The World of Warcraft engine TOC parser only loads `.lua` and `.xml` files;
+> it does not process nested `.toc` manifests. As with other major WoW
 > libraries, embedded includes should be loaded via XML or by listing the files
 > from `libItemMove.xml` directly in your parent TOC. Ensure `LibStub` is loaded
 > prior to `libItemMove.xml`.
@@ -62,14 +64,14 @@ Move operations require a `MoveContext` strategy object describing the transfer
 direction and container rules. You retrieve context strategies via
 `LibItemMove:GetContext(direction)`.
 
-| Direction String                          | Context Class    | Description / Constraints                                                                                                                                                               |
-| :---------------------------------------- | :--------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"BagToBank"` / `"bag_to_bank"`           | `BagToBank`      | Moves items from player Bags (`0..5`) to character Bank containers (`-1`, `5..11` in Classic, `6..11` in Retail). Consolidates partial stacks first.                                    |
-| `"BankToBag"` / `"bank_to_bag"`           | `BankToBag`      | Moves items from character Bank containers (`-1`, `5..11` in Classic, `6..11` in Retail) to player Bags (`0..5`). Consolidates partial stacks first.                                    |
-| `"BagToGuildBank"` / `"bag_to_guildbank"` | `BagToGuildBank` | Moves non-soulbound items from player Bags to Guild Bank (either single active tab, or multiple tabs sequentially). Checks deposit permissions and **enforces 1 move per yield cycle**. |
-| `"GuildBankToBag"` / `"guildbank_to_bag"` | `GuildBankToBag` | Moves items from current Guild Bank tab to player Bags (`0..5`). Checks withdraw permissions and **enforces 1 move per yield cycle**.                                                   |
-| `"BagToWarbank"` / `"bag_to_warbank"`     | `BagToWarbank`   | Moves items from player Bags to account Warbank tabs (`12..16`). Consolidates partial stacks first.                                                                                     |
-| `"WarbankToBag"` / `"warbank_to_bag"`     | `WarbankToBag`   | Moves items from account Warbank tabs (`12..16`) to player Bags (`0..5`). Consolidates partial stacks first.                                                                            |
+| Direction String                          | Context Class    | Description / Constraints                                                                                                                                                                                                                                                                                                                                                                                                            |
+| :---------------------------------------- | :--------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"BagToBank"` / `"bag_to_bank"`           | `BagToBank`      | Moves items from player Bags (`0..4` in Classic/MoP, `0..5` with Reagent Bag in Retail/WoW Forever) to Character Bank containers (`-1`, optional unlocked `-3`, `5..11` in Classic, `6..11` in Retail, `6..14` in WoW Forever, resolved dynamically via `C_Bank.FetchPurchasedBankTabIDs` when available). Checks `C_Bank.CanUseBank`, filters deposits via `C_Bank.IsItemAllowedInBankType`, and consolidates partial stacks first. |
+| `"BankToBag"` / `"bank_to_bag"`           | `BankToBag`      | Moves items from Character Bank containers (`-1`, optional unlocked `-3`, `5..11` in Classic, `6..11` in Retail, `6..14` in WoW Forever, resolved dynamically via `C_Bank.FetchPurchasedBankTabIDs` when available) to player Bags (`0..4` or `0..5`). Checks `C_Bank.CanUseBank` and consolidates partial stacks first.                                                                                                             |
+| `"BagToGuildBank"` / `"bag_to_guildbank"` | `BagToGuildBank` | Moves non-soulbound items from player Bags (`0..4` or `0..5`) to Guild Bank (single active tab or sequential multi-tab dictionary). Consolidates partial stacks first, checks `C_GuildBank.IsGuildBankEnabled()` and tab deposit permissions, and **enforces 1 move per verification cycle with a 0.2s cooldown**.                                                                                                                   |
+| `"GuildBankToBag"` / `"guildbank_to_bag"` | `GuildBankToBag` | Moves items from Guild Bank (single active tab or sequential multi-tab dictionary) to player Bags (`0..4` or `0..5`). Consolidates partial stacks first, checks `C_GuildBank.IsGuildBankEnabled()` and tab withdraw permissions, and **enforces 1 move per verification cycle with a 0.2s cooldown**.                                                                                                                                |
+| `"BagToWarbank"` / `"bag_to_warbank"`     | `BagToWarbank`   | Moves items from player Bags (`0..5`) to Account Warbank tabs (`12..16` in Retail, `15..23` in WoW Forever, resolved dynamically via `C_Bank.FetchPurchasedBankTabIDs`). Checks `C_Bank.CanUseBank` (fails closed with `PERMISSION_ERROR` on Classic/MoP where `C_Bank` is unavailable), filters via `C_Bank.IsItemAllowedInBankType`, and consolidates partial stacks first.                                                        |
+| `"WarbankToBag"` / `"warbank_to_bag"`     | `WarbankToBag`   | Moves items from Account Warbank tabs (`12..16` in Retail, `15..23` in WoW Forever, resolved dynamically via `C_Bank.FetchPurchasedBankTabIDs`) to player Bags (`0..5`). Checks `C_Bank.CanUseBank` (fails closed with `PERMISSION_ERROR` on Classic/MoP) and consolidates partial stacks first.                                                                                                                                     |
 
 ---
 
@@ -90,7 +92,8 @@ local slotId = LibItemMove.encode_bagslot(1, 15)
 local bag, slot = LibItemMove.decode_bagslot(-995)
 ```
 
-> [!NOTE] WoW container IDs can be negative (e.g. `BANK_CONTAINER = -1`).
+> [!NOTE]
+> WoW container IDs can be negative (e.g. `BANK_CONTAINER = -1`).
 > `decode_bagslot` correctly restores negative bag indices.
 
 ---
@@ -103,14 +106,21 @@ callback function when calling `Move()`, and/or register for global events via
 
 ### Event Types & Arguments
 
-| Event Name              | Signature                       | Description                                                                                                      |
-| :---------------------- | :------------------------------ | :--------------------------------------------------------------------------------------------------------------- |
-| `"PROGRESS"`            | `(event, itemString, qtyMoved)` | Fired immediately after a single stack slot transfer is verified.                                                |
-| `"UPDATE_UI"`           | `(event)`                       | Fired after one or more successful moves to signal UI redraw.                                                    |
-| `"CURSOR_LOCKED_ERROR"` | `(event)`                       | Fired if `GetCursorInfo()` is non-nil at routine start (protects player's held cursor items).                    |
-| `"PERMISSION_ERROR"`    | `(event)`                       | Fired if the player lacks deposit or withdrawal permissions (e.g., Guild Bank tab access).                       |
-| `"TIMEOUT_ERROR"`       | `(event)`                       | Fired if a move transaction fails to verify within 2 seconds. Transferred cursor is cleaned via `ClearCursor()`. |
-| `"DONE"`                | `(event)`                       | Fired when all requested transfers in the queue have completed.                                                  |
+| Event Name              | Signature                       | Description                                                                                                                              |
+| :---------------------- | :------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| `"PROGRESS"`            | `(event, itemString, qtyMoved)` | Fired immediately after a single stack slot transfer is verified.                                                                        |
+| `"UPDATE_UI"`           | `(event)`                       | Fired after one or more successful moves to signal UI redraw.                                                                            |
+| `"CURSOR_LOCKED_ERROR"` | `(event)`                       | Fired if `GetCursorInfo()` is non-nil at routine start or before issuing a move (protects player's held cursor items).                   |
+| `"PERMISSION_ERROR"`    | `(event)`                       | Fired if the player lacks bank or Guild Bank access (`C_GuildBank.IsGuildBankEnabled()`, tab rights, or `C_Bank.CanUseBank`).            |
+| `"TIMEOUT_ERROR"`       | `(event)`                       | Fired if slot locks or a move transaction fail to verify within 5 seconds. The cursor is cleared via `ClearCursor()`.                    |
+| `"DONE"`                | `(event)`                       | Fired when single-tab or multi-tab execution finishes (omitted on early aborts and multi-tab errors; emitted after single-tab timeouts). |
+
+> [!NOTE]
+> Calling `LibItemMove:Move()` while another move transaction is already active
+> raises a Lua `error()`. On early aborts (`CURSOR_LOCKED_ERROR`,
+> `PERMISSION_ERROR`, slot-lock `TIMEOUT_ERROR`) or errors inside a multi-tab
+> sequence, `"DONE"` is not fired. In single-tab execution, a verification
+> `TIMEOUT_ERROR` clears the cursor and still emits `"DONE"`.
 
 ---
 
@@ -178,9 +188,9 @@ end)
 
 ### Example C.2: Sequential Multi-Tab Guild Bank Transfers
 
-You can deposit items into multiple specific guild bank tabs by formatting the
-`moveQueue` as a tab-keyed dictionary containing nested item-quantity
-structures:
+You can deposit or withdraw items across multiple specific Guild Bank tabs
+(with `"BagToGuildBank"` or `"GuildBankToBag"`) by formatting the `moveQueue` as
+a tab-keyed dictionary containing nested item-quantity structures:
 
 ```lua
 -- Define specific tabs and item lists
@@ -198,7 +208,7 @@ LibItemMove:Move(multiTabQueue, "BagToGuildBank", function(event, item, qty)
     if event == "PROGRESS" then
         print(string.format("Moved %d of %s to current tab.", qty, item))
     elseif event == "TIMEOUT_ERROR" then
-        print("|cffff0000Tab switch or transfer timed out! Sequence aborted.|r")
+        print("|cffff0000Transfer timed out! Sequence aborted.|r")
     elseif event == "DONE" then
         print("All multi-tab transfers finished successfully!")
     end
@@ -262,10 +272,16 @@ LibItemMove.Debug = true
 When enabled, the library will log diagnostic messages directly to the default
 game chat frame (`DEFAULT_CHAT_FRAME`) or stdout. Diagnostic output includes:
 
-- **Bag Family Mapping**: Maps container indices to inventory slot IDs and
-  prints the outcome of `GetInventoryItemID` or `GetInventoryItemLink` and the
-  resolved bag family.
+- **Bag Family Mapping**: Queries `C_Container.GetContainerNumFreeSlots` first
+  (defaulting the Retail/WoW Forever Reagent Bag to family `2048` when `0` or
+  unavailable), returns `0` for modern virtual bank tabs without querying
+  inventory slots, and falls back to `ContainerIDToInventoryID`,
+  `GetInventoryItemID`, and `GetInventoryItemLink` on legacy containers.
 - **Scan Empty Slots**: Lists which bags are checked, their capacity, resolved
   families, and how empty slots are prioritized.
-- **Slot Filtering**: Logs step-by-step evaluations of items checking against
-  empty slots to trace why compatibilities fail or match.
+- **Slot Filtering**: Logs `itemFamily`, `isCraftingReagent`, and step-by-step
+  evaluations of items checking against empty slots to trace why
+  compatibilities fail or match.
+- **Timeout Diagnostics**: Prints `TIMEOUT DETAILS` with source quantity,
+  destination item ID and quantity, and cursor state when a verification window
+  expires.

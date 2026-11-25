@@ -56,7 +56,7 @@ function BaseContext:IsTargetSlotLocked(bag, slot)
     return self:IsSlotLocked(bag, slot)
 end
 
---- Returns item stack count at target slot ID.
+--- Returns item stack count at slot ID.
 --- @param slotId SlotId
 --- @return number count
 function BaseContext:GetSlotQuantity(slotId)
@@ -72,7 +72,7 @@ function BaseContext:GetSourceSlotQuantity(slotId)
     return self:GetSlotQuantity(slotId)
 end
 
---- Returns item stack count at target slot ID.
+--- Returns item stack count at slot ID.
 --- @param slotId SlotId
 --- @return number count
 function BaseContext:GetTargetSlotQuantity(slotId)
@@ -198,11 +198,11 @@ function BaseContext:ScanPartialSlots(containers, itemString, partialSlotsTable)
     end
 end
 
---- Default implementation for GetPartialSlots delegating to ScanPartialSlots.
+--- Base no-op hook for GetPartialSlots; concrete subclasses override this to scan target containers via ScanPartialSlots.
 --- @param itemString string|number
 --- @param partialSlotsTable table[]
 function BaseContext:GetPartialSlots(itemString, partialSlotsTable)
-    -- Default base implementation scans target containers defined in subclasses
+    -- Overridden by subclasses to pass their destination containers to ScanPartialSlots
 end
 
 --- Shared iterator over containers for matching itemString.
@@ -239,7 +239,7 @@ function BaseContext:ScanSourceSlots(containers, itemString, filterFn)
     end
 end
 
---- Alias for SlotIterator matching specification in item_movement_instructions.md.
+--- Alias for SlotIterator matching specification in docs/library_design.md.
 --- @param itemString string|number Target item identifier
 --- @return fun(): number?, SlotId?, number?
 function BaseContext:SlotIdIterator(itemString)

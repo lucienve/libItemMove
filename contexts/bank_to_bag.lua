@@ -18,7 +18,7 @@ function BankToBag:GetPlayerBags()
     return APIAdapter.GetPlayerBagIDs()
 end
 
---- Returns list of bank container IDs dynamically based on WoW client version (-1, -3, 5..11 in Classic or 6..12 in Retail).
+--- Returns list of bank container IDs dynamically based on WoW client version (-1, optional -3, 5..11 in Classic; 6..11 in Retail; 6..14 in WoW Forever).
 --- @return number[]
 function BankToBag:GetBankContainers()
     return APIAdapter.GetBankContainerIDs()
@@ -64,7 +64,7 @@ function BankToBag:PickupItem(bag, slot)
     APIAdapter.PickupContainerItem(bag, slot)
 end
 
---- Returns current stack quantity at target slot ID.
+--- Returns current stack quantity at slot ID.
 --- @param slotId SlotId
 --- @return number quantity Stack count (0 if empty)
 function BankToBag:GetSlotQuantity(slotId)
