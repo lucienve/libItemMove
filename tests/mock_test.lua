@@ -1008,4 +1008,291 @@ _G.NUM_REAGENTBAG_SLOTS = orig16NumReagentBagSlots
 _G.QueryGuildBankTab = orig16QueryGuildBankTab
 print("[PASS] MoP/Classic Warbank fail-closed, bank offset, and Guild Bank gate tests passed.")
 
+-- Test 17: Virtual Bank Tab Family Resolution, C_Bank.IsItemAllowedInBankType, and Character Bank CanUseBank
+local orig17GetContainerNumFreeSlots = _G.C_Container.GetContainerNumFreeSlots
+local orig17ContainerIDToInventoryID = _G.C_Container.ContainerIDToInventoryID
+local orig17GetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+local orig17GetInventoryItemID = _G.GetInventoryItemID
+local orig17GetItemFamily = Private.APIAdapter.GetItemFamily
+local orig17CBank = _G.C_Bank
+local orig17Enum = _G.Enum
+local orig17ItemLocation = _G.ItemLocation
+local orig17MockContainers = mockContainers
+
+local invLookupCalls = 0
+_G.C_Container.ContainerIDToInventoryID = function(bag)
+    invLookupCalls = invLookupCalls + 1
+    if bag == 5 then return 68 end
+    return nil
+end
+_G.GetInventoryItemID = function(unit, slot)
+    if unit == "player" and slot == 68 then
+        return 44446
+    end
+    return nil
+end
+Private.APIAdapter.GetItemFamily = function(itemInput)
+    if itemInput == 44446 then
+        return 1024
+    end
+    return 0
+end
+
+-- 17a: GetBagItemFamily prefers C_Container.GetContainerNumFreeSlots without calling ContainerIDToInventoryID
+_G.C_Container.GetContainerNumFreeSlots = function(bag)
+    if bag == 5 then
+        return 16, 2048
+    end
+    if bag >= 6 and bag <= 23 then
+        return 98, 0
+    end
+    return 0, nil
+end
+
+invLookupCalls = 0
+assert(Private.APIAdapter.GetBagItemFamily(6) == 0, "Test 17a: Retail CharacterBankTab 6 should resolve family 0")
+assert(Private.APIAdapter.GetBagItemFamily(11) == 0, "Test 17a: Retail CharacterBankTab 11 should resolve family 0")
+assert(Private.APIAdapter.GetBagItemFamily(12) == 0, "Test 17a: Retail AccountBankTab 12 should resolve family 0")
+assert(Private.APIAdapter.GetBagItemFamily(14) == 0, "Test 17a: Forever CharacterBankTab 14 should resolve family 0")
+assert(Private.APIAdapter.GetBagItemFamily(15) == 0, "Test 17a: Forever AccountBankTab 15 should resolve family 0")
+assert(Private.APIAdapter.GetBagItemFamily(23) == 0, "Test 17a: Forever AccountBankTab 23 should resolve family 0")
+assert(Private.APIAdapter.GetBagItemFamily(5) == 2048, "Test 17a: Reagent/specialty bag 5 should return bagFamily 2048")
+assert(invLookupCalls == 0, "Test 17a: ContainerIDToInventoryID must not be called when GetContainerNumFreeSlots returns a family")
+
+-- 17b: Virtual bank tab guard when GetContainerNumFreeSlots is absent or returns nil bagFamily
+_G.Enum = {
+    BagIndex = {
+        CharacterBankTab_1 = 6,
+        CharacterBankTab_2 = 7,
+        CharacterBankTab_3 = 8,
+        CharacterBankTab_4 = 9,
+        CharacterBankTab_5 = 10,
+        CharacterBankTab_6 = 11,
+        AccountBankTab_1 = 12,
+        AccountBankTab_2 = 13,
+        AccountBankTab_3 = 14,
+        AccountBankTab_4 = 15,
+        AccountBankTab_5 = 16,
+    }
+}
+_G.C_Bank = {
+    FetchPurchasedBankTabIDs = function()
+        return {}
+    end
+}
+_G.C_Container.GetContainerNumFreeSlots = function()
+    return 0, nil
+end
+
+invLookupCalls = 0
+assert(Private.APIAdapter.GetBagItemFamily(6) == 0, "Test 17b: Retail tab 6 must return 0 when GetContainerNumFreeSlots returns nil")
+assert(Private.APIAdapter.GetBagItemFamily(11) == 0, "Test 17b: Unpurchased Retail tab 11 must return 0 via Enum.BagIndex")
+assert(Private.APIAdapter.GetBagItemFamily(12) == 0, "Test 17b: Retail Warbank tab 12 must return 0")
+assert(invLookupCalls == 0, "Test 17b: ContainerIDToInventoryID must not be called on Retail virtual bank tabs")
+
+_G.C_Container.GetContainerNumFreeSlots = nil
+_G.Enum = {
+    BagIndex = {
+        CharacterBankTab_1 = 6,
+        CharacterBankTab_2 = 7,
+        CharacterBankTab_3 = 8,
+        CharacterBankTab_4 = 9,
+        CharacterBankTab_5 = 10,
+        CharacterBankTab_6 = 11,
+        CharacterBankTab_7 = 12,
+        CharacterBankTab_8 = 13,
+        CharacterBankTab_9 = 14,
+        AccountBankTab_1 = 15,
+        AccountBankTab_2 = 16,
+        AccountBankTab_3 = 17,
+        AccountBankTab_4 = 18,
+        AccountBankTab_5 = 19,
+        AccountBankTab_6 = 20,
+        AccountBankTab_7 = 21,
+        AccountBankTab_8 = 22,
+        AccountBankTab_9 = 23,
+    }
+}
+invLookupCalls = 0
+assert(Private.APIAdapter.GetBagItemFamily(14) == 0, "Test 17b: Forever tab 14 must return 0 when GetContainerNumFreeSlots is nil")
+assert(Private.APIAdapter.GetBagItemFamily(23) == 0, "Test 17b: Forever tab 23 must return 0 when GetContainerNumFreeSlots is nil")
+assert(invLookupCalls == 0, "Test 17b: ContainerIDToInventoryID must not be called on Forever virtual bank tabs")
+
+_G.Enum = nil
+_G.C_Bank = {
+    FetchPurchasedBankTabIDs = function(bankType)
+        if bankType == 0 then return { 6, 7 } end
+        if bankType == 2 then return { 12 } end
+        return {}
+    end
+}
+invLookupCalls = 0
+assert(Private.APIAdapter.GetBagItemFamily(6) == 0, "Test 17b: FetchPurchasedBankTabIDs fallback must guard bank tab 6")
+assert(Private.APIAdapter.GetBagItemFamily(12) == 0, "Test 17b: FetchPurchasedBankTabIDs fallback must guard warbank tab 12")
+assert(invLookupCalls == 0, "Test 17b: ContainerIDToInventoryID must not be called for purchased bank tabs without Enum")
+
+-- Classic / MoP legacy layout (no CharacterBankTab_1) must preserve ContainerIDToInventoryID fallback
+_G.C_Bank = nil
+_G.Enum = {
+    BagIndex = {
+        Bank = -1,
+        BankBag_1 = 6,
+        AccountBankTab_1 = 13,
+    }
+}
+invLookupCalls = 0
+assert(Private.APIAdapter.GetBagItemFamily(5) == 1024, "Test 17b: Classic physical bank bag 5 must preserve ContainerIDToInventoryID fallback")
+assert(invLookupCalls == 1, "Test 17b: Classic physical bank bag 5 must invoke ContainerIDToInventoryID once")
+
+-- 17c: C_Bank.IsItemAllowedInBankType filtering in BagToBank and BagToWarbank
+_G.Enum = {
+    BankType = { Character = 0, Guild = 1, Account = 2 },
+    BagIndex = {
+        CharacterBankTab_1 = 6,
+        AccountBankTab_1 = 12,
+    }
+}
+_G.ItemLocation = {
+    CreateFromBagAndSlot = function(self, bag, slot)
+        return { bag = bag, slot = slot }
+    end
+}
+local canUseCharBank = true
+_G.C_Bank = {
+    CanUseBank = function(bankType)
+        if bankType == 0 then return canUseCharBank end
+        return true
+    end,
+    FetchPurchasedBankTabIDs = function(bankType)
+        if bankType == 0 then return { 6 } end
+        if bankType == 2 then return { 12 } end
+        return {}
+    end,
+    IsItemAllowedInBankType = function(bankType, itemLocation)
+        if itemLocation and itemLocation.bag == 0 and itemLocation.slot == 1 then
+            return false -- Soulbound / restricted item in slot 1
+        end
+        if itemLocation and itemLocation.bag == 0 and itemLocation.slot == 2 then
+            return true -- Warbound / bankable item in slot 2
+        end
+        return true
+    end
+}
+_G.C_Container.GetContainerNumSlots = function(bag)
+    if bag == 0 or bag == 6 or bag == 12 then return 4 end
+    return 0
+end
+mockContainers = {
+    [0] = {
+        [1] = { itemID = 12345, stackCount = 10, isLocked = false, isBound = true, hyperlink = "item:12345" },
+        [2] = { itemID = 12345, stackCount = 10, isLocked = false, isBound = true, hyperlink = "item:12345" },
+    },
+    [6] = {},
+    [12] = {},
+}
+
+local bankIterSlots = {}
+for _, slotId in Private.BagToBank:SlotIterator("i:12345") do
+    table.insert(bankIterSlots, slotId)
+end
+assert(#bankIterSlots == 1 and bankIterSlots[1] == lib.encode_bagslot(0, 2),
+    "Test 17c: BagToBank:SlotIterator must skip disallowed slot (0,1) and yield allowed slot (0,2)")
+
+local warbankIterSlots = {}
+for _, slotId in Private.BagToWarbank:SlotIterator("i:12345") do
+    table.insert(warbankIterSlots, slotId)
+end
+assert(#warbankIterSlots == 1 and warbankIterSlots[1] == lib.encode_bagslot(0, 2),
+    "Test 17c: BagToWarbank:SlotIterator must skip disallowed slot (0,1) and allow Warbound isBound=true slot (0,2)")
+
+local b2wTimeout = false
+local b2wDone = false
+lib:Move({ ["i:12345"] = 10 }, "BagToWarbank", function(event)
+    if event == "TIMEOUT_ERROR" then b2wTimeout = true end
+    if event == "DONE" then b2wDone = true end
+end)
+ticks = 0
+while frameShown and ticks < 30 do
+    ticks = ticks + 1
+    if frameScript then frameScript(nil, 0.05) end
+end
+assert(b2wDone == true and b2wTimeout == false, "Test 17c: BagToWarbank move must complete without TIMEOUT_ERROR")
+assert(mockContainers[0][1].stackCount == 10, "Test 17c: Disallowed slot (0,1) must remain untouched")
+assert(mockContainers[0][2].stackCount == 0, "Test 17c: Allowed Warbound slot (0,2) must be moved")
+assert(mockContainers[12][1] and mockContainers[12][1].stackCount == 10, "Test 17c: Warbank tab 12 slot 1 must receive 10")
+
+-- When only disallowed slot (0,1) remains, BagToBank must skip it cleanly with DONE and no TIMEOUT_ERROR
+local b2bTimeout = false
+local b2bDone = false
+lib:Move({ ["i:12345"] = 10 }, "BagToBank", function(event)
+    if event == "TIMEOUT_ERROR" then b2bTimeout = true end
+    if event == "DONE" then b2bDone = true end
+end)
+ticks = 0
+while frameShown and ticks < 30 do
+    ticks = ticks + 1
+    if frameScript then frameScript(nil, 0.05) end
+end
+assert(b2bDone == true and b2bTimeout == false, "Test 17c: BagToBank with only disallowed item must emit DONE without TIMEOUT_ERROR")
+assert(mockContainers[0][1].stackCount == 10, "Test 17c: Disallowed slot (0,1) must remain untouched after BagToBank")
+
+-- Missing ItemLocation global must safely fall back to allowing slots
+_G.ItemLocation = nil
+local fallbackIterCount = 0
+for _ in Private.BagToBank:SlotIterator("i:12345") do
+    fallbackIterCount = fallbackIterCount + 1
+end
+assert(fallbackIterCount == 1, "Test 17c: BagToBank:SlotIterator must safely fall back when ItemLocation is nil")
+
+local fallbackWarbankCount = 0
+for _ in Private.BagToWarbank:SlotIterator("i:12345") do
+    fallbackWarbankCount = fallbackWarbankCount + 1
+end
+assert(fallbackWarbankCount == 1, "Test 17c: BagToWarbank:SlotIterator must safely fall back when ItemLocation is nil")
+
+-- 17d: Character Bank HasPermission via C_Bank.CanUseBank
+canUseCharBank = false
+assert(Private.BagToBank:HasPermission() == false, "Test 17d: BagToBank:HasPermission must return false when CanUseBank(0) is false")
+assert(Private.BankToBag:HasPermission() == false, "Test 17d: BankToBag:HasPermission must return false when CanUseBank(0) is false")
+
+local b2bPermErr = false
+local b2bPermDone = false
+lib:Move({ ["i:12345"] = 1 }, "BagToBank", function(event)
+    if event == "PERMISSION_ERROR" then b2bPermErr = true end
+    if event == "DONE" then b2bPermDone = true end
+end)
+if frameScript then frameScript(nil, 0.05) end
+assert(b2bPermErr == true and b2bPermDone == false and Private.Scheduler.active == false,
+    "Test 17d: BagToBank must emit PERMISSION_ERROR, suppress DONE, and clear scheduler when CanUseBank(0) is false")
+
+local bank2bPermErr = false
+local bank2bPermDone = false
+lib:Move({ ["i:12345"] = 1 }, "BankToBag", function(event)
+    if event == "PERMISSION_ERROR" then bank2bPermErr = true end
+    if event == "DONE" then bank2bPermDone = true end
+end)
+if frameScript then frameScript(nil, 0.05) end
+assert(bank2bPermErr == true and bank2bPermDone == false and Private.Scheduler.active == false,
+    "Test 17d: BankToBag must emit PERMISSION_ERROR, suppress DONE, and clear scheduler when CanUseBank(0) is false")
+
+canUseCharBank = true
+assert(Private.BagToBank:HasPermission() == true, "Test 17d: BagToBank:HasPermission must return true when CanUseBank(0) is true")
+assert(Private.BankToBag:HasPermission() == true, "Test 17d: BankToBag:HasPermission must return true when CanUseBank(0) is true")
+
+_G.C_Bank = nil
+assert(Private.BagToBank:HasPermission() == true, "Test 17d: BagToBank:HasPermission must return true when C_Bank is nil")
+assert(Private.BankToBag:HasPermission() == true, "Test 17d: BankToBag:HasPermission must return true when C_Bank is nil")
+
+-- Restore Test 17 globals
+_G.C_Container.GetContainerNumFreeSlots = orig17GetContainerNumFreeSlots
+_G.C_Container.ContainerIDToInventoryID = orig17ContainerIDToInventoryID
+_G.C_Container.GetContainerNumSlots = orig17GetContainerNumSlots
+_G.GetInventoryItemID = orig17GetInventoryItemID
+Private.APIAdapter.GetItemFamily = orig17GetItemFamily
+_G.C_Bank = orig17CBank
+_G.Enum = orig17Enum
+_G.ItemLocation = orig17ItemLocation
+mockContainers = orig17MockContainers
+print("[PASS] Virtual bank tab family, IsItemAllowedInBankType, and Character Bank CanUseBank tests passed.")
+
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")

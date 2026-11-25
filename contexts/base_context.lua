@@ -206,8 +206,9 @@ end
 --- Shared iterator over containers for matching itemString.
 --- @param containers number[] List of container IDs to scan
 --- @param itemString string|number Target item identifier
+--- @param filterFn? fun(bag: number, slot: number, info: table): boolean Optional predicate to filter candidate slots
 --- @return fun(): number?, SlotId?, number? Iterator function returning (index, slotId, currentQty)
-function BaseContext:ScanSourceSlots(containers, itemString)
+function BaseContext:ScanSourceSlots(containers, itemString, filterFn)
     local slotList = {}
 
     for _, bag in ipairs(containers) do
@@ -216,10 +217,12 @@ function BaseContext:ScanSourceSlots(containers, itemString)
         for slot = 1, numSlots do
             local info = APIAdapter.GetContainerItemInfo(bag, slot)
             if info and info.stackCount > 0 and Utils.IsItemMatching(itemString, info) then
-                table.insert(slotList, {
-                    slotId = Utils.encode_bagslot(bag, slot),
-                    qty = info.stackCount
-                })
+                if not filterFn or filterFn(bag, slot, info) then
+                    table.insert(slotList, {
+                        slotId = Utils.encode_bagslot(bag, slot),
+                        qty = info.stackCount
+                    })
+                end
             end
         end
     end
