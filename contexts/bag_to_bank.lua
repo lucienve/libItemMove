@@ -35,14 +35,25 @@ function BagToBank:HasPermission()
     return true
 end
 
---- Splits item from source slot and picks up on target bank slot.
+--- Moves item from source bag slot to target bank slot, splitting partial stacks and picking up full stacks.
 --- @param fromSlotId SlotId Packed source slot ID
 --- @param toSlotId SlotId Packed target slot ID
 --- @param quantity number Quantity to move
 function BagToBank:MoveSlot(fromSlotId, toSlotId, quantity)
+    if not quantity or quantity <= 0 then
+        return
+    end
+    local currentQty = self:GetSourceSlotQuantity(fromSlotId)
+    if currentQty <= 0 then
+        return
+    end
     local sBag, sSlot = Utils.decode_bagslot(fromSlotId)
     local tBag, tSlot = Utils.decode_bagslot(toSlotId)
-    APIAdapter.SplitContainerItem(sBag, sSlot, quantity)
+    if currentQty > 1 and quantity < currentQty then
+        APIAdapter.SplitContainerItem(sBag, sSlot, quantity)
+    else
+        APIAdapter.PickupContainerItem(sBag, sSlot)
+    end
     APIAdapter.PickupContainerItem(tBag, tSlot)
 end
 

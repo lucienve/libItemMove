@@ -124,3 +124,15 @@ character bags, character bank, Guild Bank, and account Warbanks.
   `uniqueID` values via `(item:[%-%d:]+)`, and changed `Utils.GetItemMaxStack`
   to fail closed to `1` instead of `100` for uncached items, with regression
   tests in [mock_test.lua](../tests/mock_test.lua) (Issue #8).
+- Updated `MoveSlot` across all six contexts
+  ([bag_to_bank.lua](../contexts/bag_to_bank.lua),
+  [bank_to_bag.lua](../contexts/bank_to_bag.lua),
+  [bag_to_guildbank.lua](../contexts/bag_to_guildbank.lua),
+  [guildbank_to_bag.lua](../contexts/guildbank_to_bag.lua),
+  [bag_to_warbank.lua](../contexts/bag_to_warbank.lua), and
+  [warbank_to_bag.lua](../contexts/warbank_to_bag.lua)) to use
+  `PickupContainerItem` / `PickupGuildBankItem` for full stacks and
+  single/unstackable items while reserving `SplitContainerItem` /
+  `SplitGuildBankItem` for partial stacks (`currentQty > 1 and quantity <
+  currentQty`), with regression tests in
+  [mock_test.lua](../tests/mock_test.lua) (Issue #7).

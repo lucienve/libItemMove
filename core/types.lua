@@ -23,7 +23,7 @@
 ---@class MoveContext
 ---@field isGuildBank boolean Whether this context operates on a Guild Bank (enforces 1 move per yield cycle)
 ---@field isWarbank boolean Whether this context operates on a Warbank
----@field MoveSlot fun(self: MoveContext, fromSlotId: SlotId, toSlotId: SlotId, quantity: number) Splits item onto cursor and drops onto target slot
+---@field MoveSlot fun(self: MoveContext, fromSlotId: SlotId, toSlotId: SlotId, quantity: number) Moves item onto cursor (splitting partial stacks or picking up full stacks) and drops onto target slot
 ---@field GetSlotQuantity fun(self: MoveContext, slotId: SlotId): number Returns item stack count at slotId (0 if empty)
 ---@field GetSourceSlotQuantity fun(self: MoveContext, slotId: SlotId): number Returns item stack count at source slotId
 ---@field GetTargetSlotQuantity fun(self: MoveContext, slotId: SlotId): number Returns item stack count at target slotId
