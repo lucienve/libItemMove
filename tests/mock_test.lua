@@ -860,4 +860,152 @@ assert(test15bProgressCount == 1, "Test 15b: Expected only 1 PROGRESS event, got
 assert(mockContainers[-1][1].stackCount == 15, "Test 15b: Bank destination stack should remain 15")
 print("[PASS] Sequential Partial-Stack Accumulation (BagToBank dropped Move 2) test passed.")
 
+-- Test 16: MoP Classic / Classic Era Warbank Fail-Closed, Bank Offset, and Guild Bank Enabled Gate
+local orig16CBank = _G.C_Bank
+local orig16Enum = _G.Enum
+local orig16CGuildBank = _G.C_GuildBank
+local orig16BankBagOffset = _G.ITEM_INVENTORY_BANK_BAG_OFFSET
+local orig16ReagentBagContainer = _G.REAGENTBAG_CONTAINER
+local orig16NumReagentBagSlots = _G.NUM_REAGENTBAG_SLOTS
+local orig16QueryGuildBankTab = _G.QueryGuildBankTab
+
+-- 16a: Warbank fails closed without C_Bank and ignores Classic Enum.BagIndex AccountBankTab_*
+_G.C_Bank = nil
+_G.Enum = {
+    BagIndex = {
+        Bank = -1,
+        Backpack = 0,
+        Bag_1 = 1,
+        Bag_2 = 2,
+        Bag_3 = 3,
+        Bag_4 = 4,
+        ReagentBag = 5,
+        BankBag_1 = 6,
+        BankBag_2 = 7,
+        BankBag_3 = 8,
+        BankBag_4 = 9,
+        BankBag_5 = 10,
+        BankBag_6 = 11,
+        BankBag_7 = 12,
+        AccountBankTab_1 = 13,
+        AccountBankTab_2 = 14,
+        AccountBankTab_3 = 15,
+        AccountBankTab_4 = 16,
+        AccountBankTab_5 = 17,
+    }
+}
+
+assert(Private.BagToWarbank:HasPermission() == false, "Test 16a: BagToWarbank:HasPermission must return false when C_Bank is nil")
+assert(Private.WarbankToBag:HasPermission() == false, "Test 16a: WarbankToBag:HasPermission must return false when C_Bank is nil")
+
+local classicWarbankContainers = Private.APIAdapter.GetWarbankContainerIDs()
+assert(#classicWarbankContainers == 0, "Test 16a: Classic Enum.BagIndex must return {} for Warbank containers")
+
+local b2wPermErr = false
+local b2wDone = false
+lib:Move({ ["i:12345"] = 1 }, "BagToWarbank", function(event)
+    if event == "PERMISSION_ERROR" then b2wPermErr = true end
+    if event == "DONE" then b2wDone = true end
+end)
+if frameScript then frameScript(nil, 0.05) end
+assert(b2wPermErr == true, "Test 16a: BagToWarbank must emit PERMISSION_ERROR when C_Bank is nil")
+assert(b2wDone == false, "Test 16a: BagToWarbank must not emit DONE on PERMISSION_ERROR")
+assert(Private.Scheduler.active == false, "Test 16a: Scheduler must clear after BagToWarbank PERMISSION_ERROR")
+
+local w2bPermErr = false
+local w2bDone = false
+lib:Move({ ["i:12345"] = 1 }, "WarbankToBag", function(event)
+    if event == "PERMISSION_ERROR" then w2bPermErr = true end
+    if event == "DONE" then w2bDone = true end
+end)
+if frameScript then frameScript(nil, 0.05) end
+assert(w2bPermErr == true, "Test 16a: WarbankToBag must emit PERMISSION_ERROR when C_Bank is nil")
+assert(w2bDone == false, "Test 16a: WarbankToBag must not emit DONE on PERMISSION_ERROR")
+assert(Private.Scheduler.active == false, "Test 16a: Scheduler must clear after WarbankToBag PERMISSION_ERROR")
+
+-- 16b: ITEM_INVENTORY_BANK_BAG_OFFSET precedence and fallback
+_G.C_Bank = nil
+_G.Enum = nil
+_G.ITEM_INVENTORY_BANK_BAG_OFFSET = 4
+_G.REAGENTBAG_CONTAINER = 5
+local offset4Player = Private.APIAdapter.GetPlayerBagIDs()
+assert(#offset4Player == 5 and offset4Player[5] == 4,
+    "Test 16b: ITEM_INVENTORY_BANK_BAG_OFFSET=4 must keep player bags as 0..4 even if REAGENTBAG_CONTAINER=5")
+local offset4Bank = Private.APIAdapter.GetBankContainerIDs()
+assert(#offset4Bank == 8 and offset4Bank[1] == -1 and offset4Bank[2] == 5 and offset4Bank[8] == 11,
+    "Test 16b: ITEM_INVENTORY_BANK_BAG_OFFSET=4 must resolve -1 and 5..11 even if REAGENTBAG_CONTAINER=5")
+
+_G.ITEM_INVENTORY_BANK_BAG_OFFSET = 5
+local offset5Bank = Private.APIAdapter.GetBankContainerIDs()
+assert(#offset5Bank == 8 and offset5Bank[1] == -1 and offset5Bank[2] == 6 and offset5Bank[8] == 12,
+    "Test 16b: ITEM_INVENTORY_BANK_BAG_OFFSET=5 must resolve -1 and 6..12")
+
+_G.ITEM_INVENTORY_BANK_BAG_OFFSET = nil
+_G.REAGENTBAG_CONTAINER = nil
+local fallbackBank = Private.APIAdapter.GetBankContainerIDs()
+assert(#fallbackBank == 8 and fallbackBank[1] == -1 and fallbackBank[2] == 5 and fallbackBank[8] == 11,
+    "Test 16b: Fallback without ITEM_INVENTORY_BANK_BAG_OFFSET must resolve -1 and 5..11")
+
+-- 16c: C_GuildBank.IsGuildBankEnabled() gate for single-tab and multi-tab moves
+local guildBankEnabled = false
+_G.C_GuildBank = {
+    IsGuildBankEnabled = function()
+        return guildBankEnabled
+    end
+}
+local queryTabCallCount = 0
+_G.QueryGuildBankTab = function(tab)
+    queryTabCallCount = queryTabCallCount + 1
+    orig16QueryGuildBankTab(tab)
+end
+
+assert(Private.BagToGuildBank:HasPermission() == false, "Test 16c: BagToGuildBank:HasPermission must return false when Guild Bank is disabled")
+assert(Private.GuildBankToBag:HasPermission() == false, "Test 16c: GuildBankToBag:HasPermission must return false when Guild Bank is disabled")
+
+local gb2bPermErr = false
+local gb2bDone = false
+lib:Move({ ["i:12345"] = 1 }, "GuildBankToBag", function(event)
+    if event == "PERMISSION_ERROR" then gb2bPermErr = true end
+    if event == "DONE" then gb2bDone = true end
+end)
+if frameScript then frameScript(nil, 0.05) end
+assert(gb2bPermErr == true and gb2bDone == false and Private.Scheduler.active == false,
+    "Test 16c: GuildBankToBag must emit PERMISSION_ERROR immediately when Guild Bank is disabled")
+
+local b2gbPermErr = false
+local b2gbDone = false
+lib:Move({ ["i:12345"] = 1 }, "BagToGuildBank", function(event)
+    if event == "PERMISSION_ERROR" then b2gbPermErr = true end
+    if event == "DONE" then b2gbDone = true end
+end)
+if frameScript then frameScript(nil, 0.05) end
+assert(b2gbPermErr == true and b2gbDone == false and Private.Scheduler.active == false,
+    "Test 16c: BagToGuildBank must emit PERMISSION_ERROR immediately when Guild Bank is disabled")
+
+activeGuildBankTab = 1
+local multiGbPermErr = false
+local multiGbDone = false
+lib:Move({ [2] = { ["i:12345"] = 1 } }, "BagToGuildBank", function(event)
+    if event == "PERMISSION_ERROR" then multiGbPermErr = true end
+    if event == "DONE" then multiGbDone = true end
+end)
+if frameScript then frameScript(nil, 0.05) end
+assert(multiGbPermErr == true and multiGbDone == false and Private.Scheduler.active == false,
+    "Test 16c: Multi-tab BagToGuildBank must emit PERMISSION_ERROR immediately when Guild Bank is disabled")
+assert(queryTabCallCount == 0, "Test 16c: Multi-tab BagToGuildBank must not query tabs when Guild Bank is disabled")
+
+guildBankEnabled = true
+assert(Private.BagToGuildBank:HasPermission() == true, "Test 16c: BagToGuildBank:HasPermission must succeed when Guild Bank is enabled")
+assert(Private.GuildBankToBag:HasPermission() == true, "Test 16c: GuildBankToBag:HasPermission must succeed when Guild Bank is enabled")
+
+-- Restore Test 16 globals
+_G.C_Bank = orig16CBank
+_G.Enum = orig16Enum
+_G.C_GuildBank = orig16CGuildBank
+_G.ITEM_INVENTORY_BANK_BAG_OFFSET = orig16BankBagOffset
+_G.REAGENTBAG_CONTAINER = orig16ReagentBagContainer
+_G.NUM_REAGENTBAG_SLOTS = orig16NumReagentBagSlots
+_G.QueryGuildBankTab = orig16QueryGuildBankTab
+print("[PASS] MoP/Classic Warbank fail-closed, bank offset, and Guild Bank gate tests passed.")
+
 print("=== ALL TESTS PASSED SUCCESSFULLY! ===")
