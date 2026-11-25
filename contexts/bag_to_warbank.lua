@@ -12,8 +12,6 @@ local BagToWarbank = BaseContext:New({
 }) --[[@as BagToWarbank]]
 Private.BagToWarbank = BagToWarbank
 
-BagToWarbank.WARBANK_CONTAINERS = { 12, 13, 14, 15, 16 }
-
 --- Returns list of player bag IDs dynamically based on WoW client version.
 --- @return number[]
 function BagToWarbank:GetPlayerBags()
@@ -23,14 +21,7 @@ end
 --- Returns list of active Warbank container IDs.
 --- @return number[]
 function BagToWarbank:GetWarbankContainers()
-    if C_Bank and C_Bank.FetchPurchasedBankTabIDs then
-        local bankTypeAccount = (Enum and Enum.BankType and Enum.BankType.Account) or 2
-        local tabs = C_Bank.FetchPurchasedBankTabIDs(bankTypeAccount)
-        if tabs and #tabs > 0 then
-            return tabs
-        end
-    end
-    return self.WARBANK_CONTAINERS
+    return APIAdapter.GetWarbankContainerIDs()
 end
 
 --- Checks if player can access the Account Warbank.
