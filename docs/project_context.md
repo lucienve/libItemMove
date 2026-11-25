@@ -110,14 +110,14 @@ character bags, character bank, Guild Bank, and account Warbanks.
   [bag_to_bank.lua](../contexts/bag_to_bank.lua) and
   [bank_to_bag.lua](../contexts/bank_to_bag.lua) with regression tests in
   [mock_test.lua](../tests/mock_test.lua) (Issue #3).
-- Fixed Retail (`120100`) and WoW Forever (`16001`) Reagent Bag (Bag `5`)
-  family resolution and compatibility matching in
+- Fixed Retail (`120100`) and WoW Forever (`16001`) Reagent Bag (Bag `5`) family
+  resolution and compatibility matching in
   [api_adapter.lua](../core/api_adapter.lua), [utils.lua](../core/utils.lua),
   [mover.lua](../mover.lua), and
   [base_context.lua](../contexts/base_context.lua) so uncached or zero-family
   Reagent Bags default to `2048` (`0x800`) instead of `0` and crafting reagents
-  (`isCraftingReagent == true` from `C_Item.GetItemInfo`) are accepted regardless
-  of legacy `GetItemFamily` bitmasks, with regression tests in
+  (`isCraftingReagent == true` from `C_Item.GetItemInfo`) are accepted
+  regardless of legacy `GetItemFamily` bitmasks, with regression tests in
   [mock_test.lua](../tests/mock_test.lua) (Issue #6).
 - Fixed `Utils.IsItemMatching` in [utils.lua](../core/utils.lua) to handle
   empty-field item strings (`item:<id>:`) and preserve negative `suffixID` /
@@ -133,8 +133,8 @@ character bags, character bank, Guild Bank, and account Warbanks.
   [warbank_to_bag.lua](../contexts/warbank_to_bag.lua)) to use
   `PickupContainerItem` / `PickupGuildBankItem` for full stacks and
   single/unstackable items while reserving `SplitContainerItem` /
-  `SplitGuildBankItem` for partial stacks (`currentQty > 1 and quantity <
-  currentQty`), with regression tests in
+  `SplitGuildBankItem` for partial stacks
+  (`currentQty > 1 and quantity < currentQty`), with regression tests in
   [mock_test.lua](../tests/mock_test.lua) (Issue #7).
 - Reconciled [README.md](../README.md), [api_guide.md](api_guide.md),
   [library_design.md](library_design.md), LuaLS annotations in
@@ -144,3 +144,11 @@ character bags, character bank, Guild Bank, and account Warbanks.
   cooldown, Warbank/Forever container IDs, Reagent Bag `isCraftingReagent`
   matching, GFM alert syntax), and fixed the `nil` case loop in Test 18d Case 3
   of [mock_test.lua](../tests/mock_test.lua).
+- Removed unused symbols, shadowed context methods, and unreachable guards
+  across core modules, [mover.lua](../mover.lua),
+  [LibItemMove.lua](../LibItemMove.lua), and all movement contexts after
+  verifying compatibility with `lucienve/bagnon_consolidator` (`Scheduler.Stop`,
+  `MoveData` / `isPartial`, `isWarbank`, `GetSlotQuantity`, `GetSlotItemId`,
+  `GetSourceSlotItemId`, `IsSlotLocked`, `SlotIdIterator`, redundant context
+  overrides, unused `ADDON_NAME` bindings, and unused
+  [.luacheckrc](../.luacheckrc) globals).

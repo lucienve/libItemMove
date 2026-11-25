@@ -12,10 +12,9 @@
     its constituent `bag` and `slot` numbers: `bag = math.floor(slotId / 1000)`
     and `slot = slotId % 1000`.
 
-> [!WARNING]
-> Older addons (like BankStack) historically used a multiplier of 100 (e.g.,
-> `bag * 100 + slot`). This is **deprecated and unsafe** in modern World of
-> Warcraft. A multiplier of **1000** is mandatory because bags and bank tabs
+> [!WARNING] Older addons (like BankStack) historically used a multiplier of 100
+> (e.g., `bag * 100 + slot`). This is **deprecated and unsafe** in modern World
+> of Warcraft. A multiplier of **1000** is mandatory because bags and bank tabs
 > can now hold 100 or more slots, which causes ID collisions with a 100
 > multiplier.
 
@@ -23,20 +22,17 @@
   (`contexts/base_context.lua`) for each transfer direction (`BagToBank`,
   `BankToBag`, `BagToGuildBank`, `GuildBankToBag`, `BagToWarbank`,
   `WarbankToBag`). Each context exposes:
-  - `isGuildBank`, `isWarbank`
+  - `isGuildBank`
   - `HasPermission()`
   - `MoveSlot(fromSlotId, toSlotId, quantity)`
   - `PickupItem(bag, slot)`
-  - `GetSlotQuantity(slotId)`, `GetSourceSlotQuantity(slotId)`,
-    `GetTargetSlotQuantity(slotId)`
-  - `GetSlotItemId(bag, slot)`, `GetSourceSlotItemId(bag, slot)`,
-    `GetTargetSlotItemId(bag, slot)`
-  - `IsSlotLocked(bag, slot)`, `IsSourceSlotLocked(bag, slot)`,
-    `IsTargetSlotLocked(bag, slot)`
+  - `GetSourceSlotQuantity(slotId)`, `GetTargetSlotQuantity(slotId)`
+  - `GetTargetSlotItemId(bag, slot)`
+  - `IsSourceSlotLocked(bag, slot)`, `IsTargetSlotLocked(bag, slot)`
   - `GetBagFamily(bag)`, `GetItemIdFromString(itemString)`
   - `GetEmptySlots(emptySlotIdsTable)`
   - `GetPartialSlots(itemString, partialSlotsTable)`
-  - `SlotIterator(itemString)` / `SlotIdIterator(itemString)`
+  - `SlotIterator(itemString)`
 
 ---
 
@@ -50,15 +46,15 @@ compatibility across Classic Era (`1.15.x`), MoP Classic (`5.5.x`), WoW Forever
 specialty resolution (`GetBagItemFamily`, `IsCraftingReagent`), and bank type
 filtering (`IsItemAllowedInBankType`):
 
-| Action                      | WoW API (Modern / Classic Fallback)                                        | Details / Safety Checks                                                                          |
-| :-------------------------- | :------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------- |
-| **Get Stack Count**         | `C_Container.GetContainerItemInfo(bag, slot)` / `GetContainerItemInfo`     | Normalized to `{ stackCount, isLocked, itemID, isBound, itemLink }`. Nil if empty.               |
-| **Split Container Item**    | `C_Container.SplitContainerItem(bag, slot, count)` / `SplitContainerItem`  | Places `count` items from a partial stack onto the cursor.                                       |
-| **Pick up Container Item**  | `C_Container.PickupContainerItem(bag, slot)` / `PickupContainerItem`       | Picks up full stack or swaps/drops item on cursor with destination slot.                         |
-| **Split Guild Bank Item**   | `SplitGuildBankItem(tab, slot, count)`                                     | Places `count` items from a Guild Bank partial stack onto the cursor.                            |
-| **Pick up Guild Bank Item** | `PickupGuildBankItem(tab, slot)`                                           | Picks up full stack or swaps/drops item on cursor with Guild Bank tab slot.                      |
-| **Check Cursor**            | `GetCursorInfo()`                                                          | Returns `"item"`, `"money"`, etc. Checked before moves, during recovery, and in verification.    |
-| **Clear Cursor**            | `ClearCursor()`                                                            | Returns held cursor items to their source slots (does not destroy items). Run on cleanup/errors. |
+| Action                      | WoW API (Modern / Classic Fallback)                                       | Details / Safety Checks                                                                          |
+| :-------------------------- | :------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------- |
+| **Get Stack Count**         | `C_Container.GetContainerItemInfo(bag, slot)` / `GetContainerItemInfo`    | Normalized to `{ stackCount, isLocked, itemID, isBound, itemLink }`. Nil if empty.               |
+| **Split Container Item**    | `C_Container.SplitContainerItem(bag, slot, count)` / `SplitContainerItem` | Places `count` items from a partial stack onto the cursor.                                       |
+| **Pick up Container Item**  | `C_Container.PickupContainerItem(bag, slot)` / `PickupContainerItem`      | Picks up full stack or swaps/drops item on cursor with destination slot.                         |
+| **Split Guild Bank Item**   | `SplitGuildBankItem(tab, slot, count)`                                    | Places `count` items from a Guild Bank partial stack onto the cursor.                            |
+| **Pick up Guild Bank Item** | `PickupGuildBankItem(tab, slot)`                                          | Picks up full stack or swaps/drops item on cursor with Guild Bank tab slot.                      |
+| **Check Cursor**            | `GetCursorInfo()`                                                         | Returns `"item"`, `"money"`, etc. Checked before moves, during recovery, and in verification.    |
+| **Clear Cursor**            | `ClearCursor()`                                                           | Returns held cursor items to their source slots (does not destroy items). Run on cleanup/errors. |
 
 ---
 
@@ -95,12 +91,14 @@ flowchart TD
    `CURSOR_LOCKED_ERROR` and abort immediately to avoid overwriting or
    misplacing the player's held item.
 2. **Permission Checks**: Call `context:HasPermission()` before scanning slots.
-   - `BagToBank` / `BankToBag`: Check `C_Bank.CanUseBank(Enum.BankType.Character)`
-     when `C_Bank` is available.
-   - `BagToWarbank` / `WarbankToBag`: Check `C_Bank.CanUseBank(Enum.BankType.Account)`
-     and fail closed when `C_Bank` is unavailable.
-   - `BagToGuildBank` / `GuildBankToBag`: Check `C_GuildBank.IsGuildBankEnabled()`
-     and `GetGuildBankTabInfo` deposit or withdrawal rights on the active tab.
+   - `BagToBank` / `BankToBag`: Check
+     `C_Bank.CanUseBank(Enum.BankType.Character)` when `C_Bank` is available.
+   - `BagToWarbank` / `WarbankToBag`: Check
+     `C_Bank.CanUseBank(Enum.BankType.Account)` and fail closed when `C_Bank` is
+     unavailable.
+   - `BagToGuildBank` / `GuildBankToBag`: Check
+     `C_GuildBank.IsGuildBankEnabled()` and `GetGuildBankTabInfo` deposit or
+     withdrawal rights on the active tab.
 3. **Deposit Eligibility & Soulbound Checks**:
    - **Guild Bank (`BagToGuildBank`)**: Verify
      `C_Container.GetContainerItemInfo(bag, slot).isBound` is false. Soulbound
@@ -129,9 +127,10 @@ bags, Reagent bags):
 2. Map empty slots to their bag family and sort them: specialized bags
    (`family ~= 0`) before general bags (`family == 0`).
 3. Pair an item with an empty slot via `Utils.IsFamilyCompatible`: general bags
-   (`0`) accept any item; Reagent Bags (`2048`) require `isCraftingReagent == true`
-   (the 17th return of `C_Item.GetItemInfo` / `GetItemInfo`); other specialty
-   bags require a non-zero `bit.band(itemFamily, bagFamily)` match.
+   (`0`) accept any item; Reagent Bags (`2048`) require
+   `isCraftingReagent == true` (the 17th return of `C_Item.GetItemInfo` /
+   `GetItemInfo`); other specialty bags require a non-zero
+   `bit.band(itemFamily, bagFamily)` match.
 
 ### Step 3.3: Execution & The Cooperative Yield Loop
 
@@ -143,8 +142,8 @@ All moves run inside a coroutine scheduler (`core/scheduler.lua`):
    (`currentQty > 1 and quantity < currentQty`). For full stacks or single /
    unstackable items, call `C_Container.PickupContainerItem` (or
    `PickupGuildBankItem`) to pick up the slot directly onto the cursor.
-2. **Cursor Placement**: Immediately after the source pickup or split, `MoveSlot`
-   calls `PickupContainerItem(toBag, toSlot)` or
+2. **Cursor Placement**: Immediately after the source pickup or split,
+   `MoveSlot` calls `PickupContainerItem(toBag, toSlot)` or
    `PickupGuildBankItem(toTab, toSlot)` to place the item into the target slot.
 3. **Clear Cursor**: Clear any stray cursor item with `ClearCursor()` before
    initiating a move step, and call `ClearCursor()` on lock timeouts,
@@ -157,11 +156,11 @@ All moves run inside a coroutine scheduler (`core/scheduler.lua`):
    scheduler on the main frame update hook (e.g. `OnUpdate`), giving the game
    client time to communicate with the server and fire container events.
 5. **Cursor Lock Recovery (Retry Loop)**: If `GetCursorInfo() == "item"` after
-   yielding (due to latency dropping the placement click), verify the cursor item
-   ID matches `expectedId`. Repeat `context:PickupItem(tBag, tSlot)` up to 10
-   times, yielding between retries, before continuing into the verification loop
-   (where `GetCursorInfo() == nil` will remain false until the 5-second timeout
-   if the item stays stuck).
+   yielding (due to latency dropping the placement click), verify the cursor
+   item ID matches `expectedId`. Repeat `context:PickupItem(tBag, tSlot)` up to
+   10 times, yielding between retries, before continuing into the verification
+   loop (where `GetCursorInfo() == nil` will remain false until the 5-second
+   timeout if the item stays stuck).
 
 ### Step 3.4: Guild Bank Rate-Limit Throttling
 
@@ -219,7 +218,8 @@ When a multi-tab queue is detected for a Guild Bank context:
 
 ## Core Mover Reference Flow
 
-`mover.lua` implements the cooperative thread engine with the following structure:
+`mover.lua` implements the cooperative thread engine with the following
+structure:
 
 ```lua
 local Mover = {}
@@ -255,7 +255,6 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                             qty = moveQty,
                             endQty = math.max(workingQty - moveQty, 0),
                             item = itemString,
-                            isPartial = true,
                             expectedDestQty = pData.currentQty + moveQty
                         })
                         remainingToMove = remainingToMove - moveQty
@@ -275,7 +274,6 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                             qty = moveQty,
                             endQty = math.max(workingQty - moveQty, 0),
                             item = itemString,
-                            isPartial = false,
                             expectedDestQty = moveQty
                         })
                         remainingToMove = remainingToMove - moveQty
@@ -424,9 +422,8 @@ exact order shown below:
 6. **Library Entrypoint (`LibItemMove.lua`)**: Registers the library with
    `LibStub` and instantiates the main interface.
 
-> [!NOTE]
-> `core/types.lua` is a static-analysis-only LuaLS `---@meta` file. Do not
-> include it in `libItemMove.toc` or `libItemMove.xml`, as executing it at
+> [!NOTE] `core/types.lua` is a static-analysis-only LuaLS `---@meta` file. Do
+> not include it in `libItemMove.toc` or `libItemMove.xml`, as executing it at
 > runtime taints Blizzard globals.
 
 By standardizing this loading order via `libItemMove.xml`, parent addons can

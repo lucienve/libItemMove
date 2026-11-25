@@ -1,5 +1,5 @@
 ---@type string, LibItemMovePrivate
-local ADDON_NAME, Private = ...
+local _, Private = ...
 Private = Private or {}
 local BaseContext = {}
 Private.BaseContext = BaseContext
@@ -18,12 +18,6 @@ function BaseContext:New(o)
     return o
 end
 
---- Returns true if the player currently has permission to move items in this context.
---- @return boolean hasPermission
-function BaseContext:HasPermission()
-    return true
-end
-
 --- Parses numeric item ID from item ID integer or item string format.
 --- @param itemString string|number
 --- @return number? itemId
@@ -35,7 +29,7 @@ end
 --- @param bag number
 --- @param slot number
 --- @return boolean isLocked
-function BaseContext:IsSlotLocked(bag, slot)
+local function IsContainerSlotLocked(bag, slot)
     local info = APIAdapter.GetContainerItemInfo(bag, slot)
     return info and info.isLocked or false
 end
@@ -45,7 +39,7 @@ end
 --- @param slot number
 --- @return boolean isLocked
 function BaseContext:IsSourceSlotLocked(bag, slot)
-    return self:IsSlotLocked(bag, slot)
+    return IsContainerSlotLocked(bag, slot)
 end
 
 --- Checks if the target slot is currently locked in transit.
@@ -53,13 +47,13 @@ end
 --- @param slot number
 --- @return boolean isLocked
 function BaseContext:IsTargetSlotLocked(bag, slot)
-    return self:IsSlotLocked(bag, slot)
+    return IsContainerSlotLocked(bag, slot)
 end
 
---- Returns item stack count at slot ID.
+--- Returns item stack count at container slot ID.
 --- @param slotId SlotId
 --- @return number count
-function BaseContext:GetSlotQuantity(slotId)
+local function GetContainerSlotQuantity(slotId)
     local bag, slot = Utils.decode_bagslot(slotId)
     local info = APIAdapter.GetContainerItemInfo(bag, slot)
     return info and info.stackCount or 0
@@ -69,14 +63,14 @@ end
 --- @param slotId SlotId
 --- @return number count
 function BaseContext:GetSourceSlotQuantity(slotId)
-    return self:GetSlotQuantity(slotId)
+    return GetContainerSlotQuantity(slotId)
 end
 
---- Returns item stack count at slot ID.
+--- Returns item stack count at target slot ID.
 --- @param slotId SlotId
 --- @return number count
 function BaseContext:GetTargetSlotQuantity(slotId)
-    return self:GetSlotQuantity(slotId)
+    return GetContainerSlotQuantity(slotId)
 end
 
 --- Returns specialty bag family bitmask for a container ID.
@@ -86,28 +80,12 @@ function BaseContext:GetBagFamily(bag)
     return APIAdapter.GetBagItemFamily(bag)
 end
 
---- Returns numeric item ID at bag & slot.
---- @param bag number
---- @param slot number
---- @return number? itemID
-function BaseContext:GetSlotItemId(bag, slot)
-    return APIAdapter.GetContainerItemID(bag, slot)
-end
-
---- Returns numeric item ID at source bag & slot.
---- @param bag number
---- @param slot number
---- @return number? itemID
-function BaseContext:GetSourceSlotItemId(bag, slot)
-    return self:GetSlotItemId(bag, slot)
-end
-
 --- Returns numeric item ID at target bag & slot.
 --- @param bag number
 --- @param slot number
 --- @return number? itemID
 function BaseContext:GetTargetSlotItemId(bag, slot)
-    return self:GetSlotItemId(bag, slot)
+    return APIAdapter.GetContainerItemID(bag, slot)
 end
 
 --- Shared helper to scan containers and retrieve empty slots sorted by family (specialty first).
@@ -198,13 +176,6 @@ function BaseContext:ScanPartialSlots(containers, itemString, partialSlotsTable)
     end
 end
 
---- Base no-op hook for GetPartialSlots; concrete subclasses override this to scan target containers via ScanPartialSlots.
---- @param itemString string|number
---- @param partialSlotsTable table[]
-function BaseContext:GetPartialSlots(itemString, partialSlotsTable)
-    -- Overridden by subclasses to pass their destination containers to ScanPartialSlots
-end
-
 --- Shared iterator over containers for matching itemString.
 --- @param containers number[] List of container IDs to scan
 --- @param itemString string|number Target item identifier
@@ -238,15 +209,3 @@ function BaseContext:ScanSourceSlots(containers, itemString, filterFn)
         return nil
     end
 end
-
---- Alias for SlotIterator matching specification in docs/library_design.md.
---- @param itemString string|number Target item identifier
---- @return fun(): number?, SlotId?, number?
-function BaseContext:SlotIdIterator(itemString)
-    if type(self.SlotIterator) == "function" then
-        return self:SlotIterator(itemString)
-    end
-    return function() return nil end
-end
-
-return BaseContext

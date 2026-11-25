@@ -1,5 +1,5 @@
 ---@type string, LibItemMovePrivate
-local ADDON_NAME, Private = ...
+local _, Private = ...
 Private = Private or {}
 local Mover = {}
 Private.Mover = Mover
@@ -86,16 +86,6 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
 
     local pending = {}
 
-    -- Support both SlotIterator and SlotIdIterator spec naming
-    local getIterator = function(ctx, itemStr)
-        if type(ctx.SlotIterator) == "function" then
-            return ctx:SlotIterator(itemStr)
-        elseif type(ctx.SlotIdIterator) == "function" then
-            return ctx:SlotIdIterator(itemStr)
-        end
-        return function() return nil end
-    end
-
     -- Pair source items to move with destination target slots (Partial stacks first, empty slots second)
     for itemString, qtyToMove in pairs(moveQueue) do
         local remainingToMove = qtyToMove
@@ -106,9 +96,7 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
             context:GetPartialSlots(itemString, partialSlots)
         end
 
-
-
-        for _, srcIdx, currentQty in getIterator(context, itemString) do
+        for _, srcIdx, currentQty in context:SlotIterator(itemString) do
             local workingQty = currentQty
             if remainingToMove > 0 then
                 -- Try to merge into partial target stacks first
@@ -121,7 +109,6 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                             qty = moveQty,
                             endQty = math.max(workingQty - moveQty, 0),
                             item = itemString,
-                            isPartial = true,
                             expectedDestQty = pData.currentQty + moveQty
                         })
                         remainingToMove = remainingToMove - moveQty
@@ -142,7 +129,6 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
                             qty = moveQty,
                             endQty = math.max(workingQty - moveQty, 0),
                             item = itemString,
-                            isPartial = false,
                             expectedDestQty = moveQty
                         })
                         remainingToMove = remainingToMove - moveQty
@@ -225,15 +211,11 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
         while not didMove and (((_G.GetTime and _G.GetTime()) or os.time()) < timeout) do
             for moveIndex, moveData in pairs(pending) do
                 if not context.isGuildBank or moveIndex == movedSlotId then
-                    local getSrcQty = context.GetSourceSlotQuantity or context.GetSlotQuantity
-                    local getDestItemId = context.GetTargetSlotItemId or context.GetSlotItemId
-                    local getDestQty = context.GetTargetSlotQuantity or context.GetSlotQuantity
-
-                    local srcQtyOk = getSrcQty(context, moveData.src) <= moveData.endQty
+                    local srcQtyOk = context:GetSourceSlotQuantity(moveData.src) <= moveData.endQty
                     local tBag, tSlot = Utils.decode_bagslot(moveData.target)
                     local expectedId = context:GetItemIdFromString(moveData.item)
-                    local destItemIdOk = (getDestItemId(context, tBag, tSlot) == expectedId)
-                    local destQtyOk = getDestQty(context, moveData.target) >= moveData.expectedDestQty
+                    local destItemIdOk = (context:GetTargetSlotItemId(tBag, tSlot) == expectedId)
+                    local destQtyOk = context:GetTargetSlotQuantity(moveData.target) >= moveData.expectedDestQty
                     local cursorOk = APIAdapter.GetCursorInfo() == nil
 
                     if srcQtyOk and destItemIdOk and destQtyOk and cursorOk then
@@ -262,15 +244,12 @@ function Mover.MoveThread(moveQueue, context, callback, dispatchGlobalEvent)
         if not didMove then
             for moveIndex, moveData in pairs(pending) do
                 if not context.isGuildBank or moveIndex == movedSlotId then
-                    local getSrcQty = context.GetSourceSlotQuantity or context.GetSlotQuantity
-                    local getDestItemId = context.GetTargetSlotItemId or context.GetSlotItemId
-                    local getDestQty = context.GetTargetSlotQuantity or context.GetSlotQuantity
                     local tBag, tSlot = Utils.decode_bagslot(moveData.target)
                     local sBag, sSlot = Utils.decode_bagslot(moveData.src)
                     Private.DebugLog("TIMEOUT DETAILS: Item=%s, Qty=%s, Src=[%s,%s] (Qty left=%s, expected end=%s), Dest=[%s,%s] (ItemID=%s, Qty=%s, expected=%s), Cursor=%s",
                         tostring(moveData.item), tostring(moveData.qty),
-                        tostring(sBag), tostring(sSlot), tostring(getSrcQty(context, moveData.src)), tostring(moveData.endQty),
-                        tostring(tBag), tostring(tSlot), tostring(getDestItemId(context, tBag, tSlot)), tostring(getDestQty(context, moveData.target)), tostring(moveData.expectedDestQty),
+                        tostring(sBag), tostring(sSlot), tostring(context:GetSourceSlotQuantity(moveData.src)), tostring(moveData.endQty),
+                        tostring(tBag), tostring(tSlot), tostring(context:GetTargetSlotItemId(tBag, tSlot)), tostring(context:GetTargetSlotQuantity(moveData.target)), tostring(moveData.expectedDestQty),
                         tostring(APIAdapter.GetCursorInfo())
                     )
                 end
@@ -386,5 +365,3 @@ end
 function Mover.StartMultiTabMove(moveQueue, context, callback, dispatchGlobalEvent)
     Scheduler.Start(Mover.MoveMultiTabThread, moveQueue, context, callback, dispatchGlobalEvent)
 end
-
-return Mover

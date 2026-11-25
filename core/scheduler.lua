@@ -1,8 +1,10 @@
 ---@type string, LibItemMovePrivate
-local ADDON_NAME, Private = ...
+local _, Private = ...
 Private = Private or {}
 local Scheduler = { thread = nil, active = false }
 Private.Scheduler = Scheduler
+
+local APIAdapter = Private.APIAdapter
 
 local frame = nil
 
@@ -22,11 +24,7 @@ function Scheduler.Tick()
 
     local success, err = coroutine.resume(Scheduler.thread)
     if not success then
-        if Private.APIAdapter then
-            Private.APIAdapter.ClearCursor()
-        elseif _G.ClearCursor then
-            _G.ClearCursor()
-        end
+        APIAdapter.ClearCursor()
         Scheduler.active = false
         Scheduler.thread = nil
         if frame then frame:Hide() end
@@ -60,23 +58,10 @@ function Scheduler.Start(func, ...)
     -- Initial step execution
     local success, err = coroutine.resume(Scheduler.thread, ...)
     if not success then
-        if Private.APIAdapter then
-            Private.APIAdapter.ClearCursor()
-        elseif _G.ClearCursor then
-            _G.ClearCursor()
-        end
+        APIAdapter.ClearCursor()
         Scheduler.active = false
         Scheduler.thread = nil
         if frame then frame:Hide() end
         error("LibItemMove Start Error: " .. tostring(err))
     end
 end
-
---- Stops current scheduler thread and cleans up frame.
-function Scheduler.Stop()
-    Scheduler.active = false
-    Scheduler.thread = nil
-    if frame then frame:Hide() end
-end
-
-return Scheduler

@@ -1,11 +1,6 @@
 std = "lua51"
 
 globals = {
-    "LibStub",
-    "CreateFrame",
-    "GetTime",
-    "GetCursorInfo",
-    "ClearCursor",
     "C_Container",
     "C_Item",
     "C_Bank",
@@ -31,13 +26,9 @@ globals = {
     "GetInventoryItemLink",
     "IsReagentBankUnlocked",
     "GetGuildBankTabInfo",
-    "GetGuildBankItemInfo",
-    "GetGuildBankItemLink",
     "GetCurrentGuildBankTab",
     "SetCurrentGuildBankTab",
     "QueryGuildBankTab",
-    "SplitGuildBankItem",
-    "PickupGuildBankItem",
 }
 
 unused_args = false
@@ -49,6 +40,5 @@ exclude_files = {
 }
 
 ignore = {
-    "211/ADDON_NAME",
     "211/_",
 }

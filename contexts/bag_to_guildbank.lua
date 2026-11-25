@@ -1,14 +1,15 @@
 ---@type string, LibItemMovePrivate
-local ADDON_NAME, Private = ...
+local _, Private = ...
 Private = Private or {}
 local BaseContext = Private.BaseContext
 local Utils = Private.Utils
 local APIAdapter = Private.APIAdapter
 
+local MAX_GUILDBANK_SLOTS_PER_TAB = 98
+
 ---@class BagToGuildBank : BaseContext
 local BagToGuildBank = BaseContext:New({
-    isGuildBank = true,
-    isWarbank = false
+    isGuildBank = true
 }) --[[@as BagToGuildBank]]
 Private.BagToGuildBank = BagToGuildBank
 
@@ -70,15 +71,6 @@ function BagToGuildBank:PickupItem(tab, slot)
     APIAdapter.PickupGuildBankItem(tab, slot)
 end
 
---- Returns current stack quantity at player source bag slot ID.
---- @param slotId SlotId
---- @return number count
-function BagToGuildBank:GetSourceSlotQuantity(slotId)
-    local bag, slot = Utils.decode_bagslot(slotId)
-    local info = APIAdapter.GetContainerItemInfo(bag, slot)
-    return info and info.stackCount or 0
-end
-
 --- Returns current stack quantity at Guild Bank target tab slot ID.
 --- @param slotId SlotId
 --- @return number count
@@ -91,21 +83,6 @@ function BagToGuildBank:GetTargetSlotQuantity(slotId)
     return 0
 end
 
---- Retained for backwards compatibility: defaults to target slot quantity.
---- @param slotId SlotId
---- @return number count
-function BagToGuildBank:GetSlotQuantity(slotId)
-    return self:GetTargetSlotQuantity(slotId)
-end
-
---- Returns numeric Item ID at player source bag & slot.
---- @param bag number
---- @param slot number
---- @return number? itemID
-function BagToGuildBank:GetSourceSlotItemId(bag, slot)
-    return APIAdapter.GetContainerItemID(bag, slot)
-end
-
 --- Returns numeric Item ID at Guild Bank target tab & slot.
 --- @param tab number
 --- @param slot number
@@ -116,23 +93,6 @@ function BagToGuildBank:GetTargetSlotItemId(tab, slot)
         return Utils.GetItemIdFromString(link)
     end
     return nil
-end
-
---- Retained for backwards compatibility: defaults to target slot item ID.
---- @param tab number
---- @param slot number
---- @return number? itemID
-function BagToGuildBank:GetSlotItemId(tab, slot)
-    return self:GetTargetSlotItemId(tab, slot)
-end
-
---- Checks if source player bag slot is locked in transit.
---- @param bag number
---- @param slot number
---- @return boolean isLocked
-function BagToGuildBank:IsSourceSlotLocked(bag, slot)
-    local info = APIAdapter.GetContainerItemInfo(bag, slot)
-    return info and info.isLocked or false
 end
 
 --- Checks if target Guild Bank tab slot is locked in transit.
@@ -151,7 +111,6 @@ end
 --- @param emptySlotIdsTable SlotId[] Array to populate
 function BagToGuildBank:GetEmptySlots(emptySlotIdsTable)
     local currentTab = (_G.GetCurrentGuildBankTab and _G.GetCurrentGuildBankTab()) or 1
-    local MAX_GUILDBANK_SLOTS_PER_TAB = 98
 
     for slot = 1, MAX_GUILDBANK_SLOTS_PER_TAB do
         local count = self:GetTargetSlotQuantity(Utils.encode_bagslot(currentTab, slot))
@@ -171,7 +130,6 @@ function BagToGuildBank:GetPartialSlots(itemString, partialSlotsTable)
     if maxStack <= 1 then return end
 
     local currentTab = (_G.GetCurrentGuildBankTab and _G.GetCurrentGuildBankTab()) or 1
-    local MAX_GUILDBANK_SLOTS_PER_TAB = 98
 
     for slot = 1, MAX_GUILDBANK_SLOTS_PER_TAB do
         local link = _G.GetGuildBankItemLink and _G.GetGuildBankItemLink(currentTab, slot)
@@ -221,7 +179,3 @@ function BagToGuildBank:SlotIterator(itemString)
         return nil
     end
 end
-
-BagToGuildBank.SlotIdIterator = BagToGuildBank.SlotIterator
-
-return BagToGuildBank

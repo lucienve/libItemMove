@@ -8,16 +8,6 @@
 --- Event names passed to callbacks: "PROGRESS" | "UPDATE_UI" | "TIMEOUT_ERROR" | "CURSOR_LOCKED_ERROR" | "PERMISSION_ERROR" | "DONE"
 ---@alias CallbackEvent string
 
---- Table describing an individual slot movement transaction
----@class MoveData
----@field src SlotId Packed source slot ID
----@field target SlotId Packed destination slot ID
----@field qty number Quantity to move
----@field endQty number Expected source slot quantity remaining after move
----@field expectedDestQty number Expected destination stack quantity after move
----@field item string|number Item string or numeric ID identifier (e.g. "i:12345")
----@field isPartial boolean True if merging into an existing partial stack
-
 --- Map of item identifiers to quantity to move: { [itemString]: quantity }
 ---@alias MoveQueue table<string|number, number>
 
@@ -27,21 +17,15 @@
 --- Abstract strategy interface for container movement directions
 ---@class MoveContext
 ---@field isGuildBank boolean Whether this context operates on a Guild Bank (enforces 1 move per yield cycle)
----@field isWarbank boolean Whether this context operates on a Warbank
 ---@field MoveSlot fun(self: MoveContext, fromSlotId: SlotId, toSlotId: SlotId, quantity: number) Moves item onto cursor (splitting partial stacks or picking up full stacks) and drops onto target slot
----@field GetSlotQuantity fun(self: MoveContext, slotId: SlotId): number Returns item stack count at slotId (0 if empty)
 ---@field GetSourceSlotQuantity fun(self: MoveContext, slotId: SlotId): number Returns item stack count at source slotId
 ---@field GetTargetSlotQuantity fun(self: MoveContext, slotId: SlotId): number Returns item stack count at target slotId
----@field GetSlotItemId fun(self: MoveContext, bag: number, slot: number): number? Returns item ID at bag & slot
----@field GetSourceSlotItemId fun(self: MoveContext, bag: number, slot: number): number? Returns item ID at source bag & slot
 ---@field GetTargetSlotItemId fun(self: MoveContext, bag: number, slot: number): number? Returns item ID at target bag & slot
 ---@field GetItemIdFromString fun(self: MoveContext, itemString: string|number): number? Parses numeric item ID from item string
 ---@field PickupItem fun(self: MoveContext, bag: number, slot: number) Drops held item or picks up item at slot
 ---@field GetEmptySlots fun(self: MoveContext, emptySlotIdsTable: SlotId[]) Appends eligible empty slot IDs sorted by family
 ---@field GetPartialSlots fun(self: MoveContext, itemString: string|number, partialSlotsTable: table[]) Appends eligible partial slot data { slotId, currentQty, roomLeft }
 ---@field SlotIterator fun(self: MoveContext, itemString: string|number): fun(): number?, SlotId?, number? Iterates source slots containing item
----@field SlotIdIterator fun(self: MoveContext, itemString: string|number): fun(): number?, SlotId?, number? Alias for SlotIterator
----@field IsSlotLocked fun(self: MoveContext, bag: number, slot: number): boolean Returns true if item is locked in transit
 ---@field IsSourceSlotLocked fun(self: MoveContext, bag: number, slot: number): boolean Returns true if source item is locked in transit
 ---@field IsTargetSlotLocked fun(self: MoveContext, bag: number, slot: number): boolean Returns true if target item is locked in transit
 ---@field GetBagFamily fun(self: MoveContext, bag: number): number Returns the item family bitmask for the specified bag

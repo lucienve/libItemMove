@@ -1,5 +1,5 @@
 ---@type string, LibItemMovePrivate
-local ADDON_NAME, Private = ...
+local _, Private = ...
 Private = Private or {}
 local BaseContext = Private.BaseContext
 local Utils = Private.Utils
@@ -7,8 +7,7 @@ local APIAdapter = Private.APIAdapter
 
 ---@class BagToWarbank : BaseContext
 local BagToWarbank = BaseContext:New({
-    isGuildBank = false,
-    isWarbank = true
+    isGuildBank = false
 }) --[[@as BagToWarbank]]
 Private.BagToWarbank = BagToWarbank
 
@@ -63,23 +62,6 @@ function BagToWarbank:PickupItem(bag, slot)
     APIAdapter.PickupContainerItem(bag, slot)
 end
 
---- Returns current stack quantity at slot ID.
---- @param slotId SlotId
---- @return number quantity Stack count (0 if empty)
-function BagToWarbank:GetSlotQuantity(slotId)
-    local bag, slot = Utils.decode_bagslot(slotId)
-    local info = APIAdapter.GetContainerItemInfo(bag, slot)
-    return info and info.stackCount or 0
-end
-
---- Returns numeric Item ID at bag and slot.
---- @param bag number
---- @param slot number
---- @return number? itemID
-function BagToWarbank:GetSlotItemId(bag, slot)
-    return APIAdapter.GetContainerItemID(bag, slot)
-end
-
 --- Retrieves list of empty slot IDs in destination Warbank tabs sorted by family.
 --- @param emptySlotIdsTable SlotId[] Array to populate
 function BagToWarbank:GetEmptySlots(emptySlotIdsTable)
@@ -104,7 +86,3 @@ end
 function BagToWarbank:SlotIterator(itemString)
     return self:ScanSourceSlots(self:GetPlayerBags(), itemString, IsAllowedInAccountBank)
 end
-
-BagToWarbank.SlotIdIterator = BagToWarbank.SlotIterator
-
-return BagToWarbank

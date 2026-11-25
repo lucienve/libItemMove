@@ -1,5 +1,5 @@
 ---@type string, LibItemMovePrivate
-local ADDON_NAME, Private = ...
+local _, Private = ...
 Private = Private or {}
 local APIAdapter = {}
 Private.APIAdapter = APIAdapter
@@ -529,5 +529,3 @@ function APIAdapter.IsItemAllowedInBankType(bankType, bag, slot)
     end
     return true
 end
-
-return APIAdapter

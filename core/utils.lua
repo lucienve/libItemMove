@@ -1,5 +1,5 @@
 ---@type string, LibItemMovePrivate
-local ADDON_NAME, Private = ...
+local _, Private = ...
 Private = Private or {}
 local Utils = {}
 Private.Utils = Utils
@@ -150,5 +150,3 @@ function Private.DebugLog(fmt, ...)
         end
     end
 end
-
-return Utils

@@ -11,7 +11,7 @@ if not lib then
 end
 
 ---@type string, LibItemMovePrivate
-local ADDON_NAME, Private = ...
+local _, Private = ...
 Private = Private or {}
 
 local Utils = Private.Utils
@@ -104,9 +104,6 @@ function lib:Move(moveQueue, context, callback)
     end
 
     if isMultiTab then
-        if type(Mover.StartMultiTabMove) ~= "function" then
-            error("LibItemMove: Mover.StartMultiTabMove is not implemented.")
-        end
         ---@cast moveQueue MultiTabMoveQueue
         Mover.StartMultiTabMove(moveQueue, ctxObj, callback, DispatchGlobalEvent)
     else
