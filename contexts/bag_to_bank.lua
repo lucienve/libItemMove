@@ -24,6 +24,17 @@ function BagToBank:GetBankContainers()
     return APIAdapter.GetBankContainerIDs()
 end
 
+--- Checks if player can access the Character Bank.
+--- Falls back to true on legacy clients where C_Bank is unavailable.
+--- @return boolean
+function BagToBank:HasPermission()
+    if C_Bank and C_Bank.CanUseBank then
+        local bankTypeCharacter = (Enum and Enum.BankType and Enum.BankType.Character) or 0
+        return not not C_Bank.CanUseBank(bankTypeCharacter)
+    end
+    return true
+end
+
 --- Splits item from source slot and picks up on target bank slot.
 --- @param fromSlotId SlotId Packed source slot ID
 --- @param toSlotId SlotId Packed target slot ID
@@ -72,11 +83,16 @@ function BagToBank:GetPartialSlots(itemString, partialSlotsTable)
     self:ScanPartialSlots(self:GetBankContainers(), itemString, partialSlotsTable)
 end
 
+local function IsAllowedInCharacterBank(bag, slot)
+    local bankTypeCharacter = (Enum and Enum.BankType and Enum.BankType.Character) or 0
+    return APIAdapter.IsItemAllowedInBankType(bankTypeCharacter, bag, slot)
+end
+
 --- Iterates player bag slots containing specified item.
 --- @param itemString string|number
 --- @return fun(): number?, SlotId?, number?
 function BagToBank:SlotIterator(itemString)
-    return self:ScanSourceSlots(self:GetPlayerBags(), itemString)
+    return self:ScanSourceSlots(self:GetPlayerBags(), itemString, IsAllowedInCharacterBank)
 end
 
 BagToBank.SlotIdIterator = BagToBank.SlotIterator

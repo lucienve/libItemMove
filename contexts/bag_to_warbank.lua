@@ -82,11 +82,16 @@ function BagToWarbank:GetPartialSlots(itemString, partialSlotsTable)
     self:ScanPartialSlots(self:GetWarbankContainers(), itemString, partialSlotsTable)
 end
 
+local function IsAllowedInAccountBank(bag, slot)
+    local bankTypeAccount = (Enum and Enum.BankType and Enum.BankType.Account) or 2
+    return APIAdapter.IsItemAllowedInBankType(bankTypeAccount, bag, slot)
+end
+
 --- Iterates player bag slots containing specified item.
 --- @param itemString string|number
 --- @return fun(): number?, SlotId?, number?
 function BagToWarbank:SlotIterator(itemString)
-    return self:ScanSourceSlots(self:GetPlayerBags(), itemString)
+    return self:ScanSourceSlots(self:GetPlayerBags(), itemString, IsAllowedInAccountBank)
 end
 
 BagToWarbank.SlotIdIterator = BagToWarbank.SlotIterator

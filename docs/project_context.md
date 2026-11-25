@@ -98,3 +98,15 @@ character bags, character bank, Guild Bank, and account Warbanks.
   [guildbank_to_bag.lua](../contexts/guildbank_to_bag.lua), and
   [mover.lua](../mover.lua) with regression tests in
   [mock_test.lua](../tests/mock_test.lua) (Issue #5).
+- Updated `APIAdapter.GetBagItemFamily` in
+  [api_adapter.lua](../core/api_adapter.lua) to query
+  `C_Container.GetContainerNumFreeSlots` first and return `0` for modern virtual
+  bank tabs without calling `ContainerIDToInventoryID`, added
+  `C_Bank.IsItemAllowedInBankType` deposit filtering in
+  [base_context.lua](../contexts/base_context.lua),
+  [bag_to_bank.lua](../contexts/bag_to_bank.lua), and
+  [bag_to_warbank.lua](../contexts/bag_to_warbank.lua), and added
+  `C_Bank.CanUseBank` permission checks in
+  [bag_to_bank.lua](../contexts/bag_to_bank.lua) and
+  [bank_to_bag.lua](../contexts/bank_to_bag.lua) with regression tests in
+  [mock_test.lua](../tests/mock_test.lua) (Issue #3).

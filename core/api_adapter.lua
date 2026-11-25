@@ -61,6 +61,61 @@ local function FetchPurchasedBankTabs(bankType)
     return nil
 end
 
+--- Checks whether bag matches any contiguous Enum.BagIndex member for a prefix.
+--- @param bagIndex table<string, number?>
+--- @param prefix string
+--- @param bag number
+--- @return boolean
+local function IsEnumBankTabPrefix(bagIndex, prefix, bag)
+    local i = 1
+    while true do
+        local tabID = bagIndex[prefix .. i]
+        if type(tabID) ~= "number" then
+            return false
+        end
+        if tabID == bag then
+            return true
+        end
+        i = i + 1
+    end
+end
+
+--- Returns true when bag corresponds to a modern virtual bank or Warbank tab.
+--- @param bag number Container ID
+--- @return boolean isModernTab
+local function IsModernBankTab(bag)
+    local bagIndex = Enum and Enum.BagIndex --[[@as table<string, number?>]]
+    if type(bagIndex) == "table" and type(bagIndex["CharacterBankTab_1"]) == "number" then
+        if IsEnumBankTabPrefix(bagIndex, "CharacterBankTab_", bag) or IsEnumBankTabPrefix(bagIndex, "AccountBankTab_", bag) then
+            return true
+        end
+    end
+
+    if C_Bank and C_Bank.FetchPurchasedBankTabIDs then
+        local bankTypeCharacter = (Enum and Enum.BankType and Enum.BankType.Character) or 0
+        local charTabs = FetchPurchasedBankTabs(bankTypeCharacter)
+        if charTabs then
+            for _, tabID in ipairs(charTabs) do
+                if tabID == bag then
+                    return true
+                end
+            end
+        end
+
+        local bankTypeAccount = (Enum and Enum.BankType and Enum.BankType.Account) or 2
+        local accountTabs = FetchPurchasedBankTabs(bankTypeAccount)
+        if accountTabs then
+            for _, tabID in ipairs(accountTabs) do
+                if tabID == bag then
+                    return true
+                end
+            end
+        end
+    end
+
+    return false
+end
+
 --- Returns list of character bank container IDs dynamically based on WoW version.
 --- Classic Era / Mists Classic: -1 (BANK_CONTAINER), optional -3 (Reagent Bank), and Bank Bags 5..11
 --- Modern Retail (11.0+): CharacterBankTab_1..6 (6..11) via C_Bank or Enum.BagIndex
@@ -310,6 +365,23 @@ function APIAdapter.GetBagItemFamily(bag)
         return 0
     end
 
+    if C_Container and C_Container.GetContainerNumFreeSlots then
+        local _, bagFamily = C_Container.GetContainerNumFreeSlots(bag)
+        if type(bagFamily) == "number" then
+            if Private.DebugLog then
+                Private.DebugLog("GetBagItemFamily(%s): GetContainerNumFreeSlots returned family = %s", tostring(bag), tostring(bagFamily))
+            end
+            return bagFamily
+        end
+    end
+
+    if IsModernBankTab(bag) then
+        if Private.DebugLog then
+            Private.DebugLog("GetBagItemFamily(%s): modern virtual bank tab detected, returning 0", tostring(bag))
+        end
+        return 0
+    end
+
     local invID = nil
     if C_Container and C_Container.ContainerIDToInventoryID then
         invID = C_Container.ContainerIDToInventoryID(bag)
@@ -365,6 +437,29 @@ function APIAdapter.GetBagItemFamily(bag)
         Private.DebugLog("GetBagItemFamily(%s): failed to resolve family, returning 0", tostring(bag))
     end
     return 0
+end
+
+--- Checks whether an item at (bag, slot) is allowed in the specified bank type.
+--- Returns true when C_Bank.IsItemAllowedInBankType or ItemLocation is unavailable
+--- (for example, Classic clients or headless tests without ItemLocation).
+--- @param bankType number Enum.BankType value
+--- @param bag number Container ID
+--- @param slot number Slot index
+--- @return boolean isAllowed
+function APIAdapter.IsItemAllowedInBankType(bankType, bag, slot)
+    if bankType == nil or bag == nil or slot == nil then
+        return false
+    end
+    if C_Bank and C_Bank.IsItemAllowedInBankType then
+        local itemLocationFactory = _G["ItemLocation"]
+        if type(itemLocationFactory) == "table" and type(itemLocationFactory.CreateFromBagAndSlot) == "function" then
+            local itemLocation = itemLocationFactory:CreateFromBagAndSlot(bag, slot)
+            if itemLocation ~= nil then
+                return not not C_Bank.IsItemAllowedInBankType(bankType, itemLocation)
+            end
+        end
+    end
+    return true
 end
 
 return APIAdapter

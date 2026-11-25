@@ -46,7 +46,7 @@
 ---@field New fun(self: BaseContext, o?: table): any Creates a new context instance
 ---@field ScanEmptySlots fun(self: BaseContext, containers: number[], emptySlotIdsTable: SlotId[]) Scans containers for empty slots
 ---@field ScanPartialSlots fun(self: BaseContext, containers: number[], itemString: string|number, partialSlotsTable: table[]) Scans containers for partial stacks
----@field ScanSourceSlots fun(self: BaseContext, containers: number[], itemString: string|number): fun(): number?, SlotId?, number? Scans containers for source item slots
+---@field ScanSourceSlots fun(self: BaseContext, containers: number[], itemString: string|number, filterFn?: fun(bag: number, slot: number, info: table): boolean): fun(): number?, SlotId?, number? Scans containers for source item slots
 
 --- Signature for per-move progress callbacks
 ---@alias MoveCallbackFun fun(event: CallbackEvent, ...: any)

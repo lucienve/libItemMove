@@ -24,6 +24,17 @@ function BankToBag:GetBankContainers()
     return APIAdapter.GetBankContainerIDs()
 end
 
+--- Checks if player can access the Character Bank.
+--- Falls back to true on legacy clients where C_Bank is unavailable.
+--- @return boolean
+function BankToBag:HasPermission()
+    if C_Bank and C_Bank.CanUseBank then
+        local bankTypeCharacter = (Enum and Enum.BankType and Enum.BankType.Character) or 0
+        return not not C_Bank.CanUseBank(bankTypeCharacter)
+    end
+    return true
+end
+
 --- Splits item from bank slot and picks up on target bag slot.
 --- @param fromSlotId SlotId Packed source slot ID
 --- @param toSlotId SlotId Packed target slot ID
