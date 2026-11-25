@@ -1,4 +1,6 @@
 ---@meta
+-- Static analysis type definitions for LuaLS only.
+-- Do not list this file in .toc or .xml manifests; executing it in-game taints Blizzard globals.
 
 --- Packed integer representing a bag slot: (bagID * 1000) + slotIndex
 ---@alias SlotId number

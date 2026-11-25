@@ -299,23 +299,25 @@ Include" pattern, allowing the entire library to be loaded with a single
 
 ### Manifest File Order of Loading
 
-To satisfy internal code dependencies, the files must be loaded in the exact
-order shown below:
+To satisfy internal code dependencies, the runtime files must be loaded in the
+exact order shown below:
 
-1. **Core Types (`core/types.lua`)**: Declares the addon namespace, class
-   structures, metadata, and EmmyLua annotations. Must be loaded first.
-2. **Utilities (`core/utils.lua`)**: Contains general-purpose helpers (e.g.
+1. **Utilities (`core/utils.lua`)**: Contains general-purpose helpers (e.g.
    packed slot encoding and decoding).
-3. **API Adapter (`core/api_adapter.lua`)**: Adapts client APIs between classic
+2. **API Adapter (`core/api_adapter.lua`)**: Adapts client APIs between classic
    Era/Vanilla and modern Retail containers (`C_Container`).
-4. **Scheduler (`core/scheduler.lua`)**: Manages the cooperative coroutine
+3. **Scheduler (`core/scheduler.lua`)**: Manages the cooperative coroutine
    execution flow using `OnUpdate` frame ticks.
-5. **Context Strategies (`contexts/*`)**: Concrete strategy classes representing
+4. **Context Strategies (`contexts/*`)**: Concrete strategy classes representing
    bag, bank, guildbank, and warbank movements.
-6. **Core Mover (`mover.lua`)**: The core item mover implementation that handles
+5. **Core Mover (`mover.lua`)**: The core item mover implementation that handles
    slot pairing and transaction loop.
-7. **Library Entrypoint (`LibItemMove.lua`)**: Registers the library with
+6. **Library Entrypoint (`LibItemMove.lua`)**: Registers the library with
    `LibStub` and instantiates the main interface.
+
+> [!NOTE] `core/types.lua` is a static-analysis-only LuaLS `---@meta` file. Do
+> not include it in `libItemMove.toc` or `libItemMove.xml`, as executing it at
+> runtime taints Blizzard globals.
 
 By standardizing this loading order via `libItemMove.xml`, parent addons can
 safely import the library without manually specifying the files or managing
